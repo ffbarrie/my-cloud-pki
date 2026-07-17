@@ -5,6 +5,8 @@ Documentation, HSM initialization, and ceremony scripts for the offline root CA.
 ## Runbooks
 
 - [Offline CA Ceremony Runbook](ceremony-runbook.md)
+- Waiting for HSMs, or no HSM at all?
+  [Bootstrap software root CA](../bootstrap/software-root-ca.md)
 
 ## Certificate profiles
 

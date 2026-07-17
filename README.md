@@ -8,6 +8,13 @@ Architecture decisions live in the central [My Cloud](https://github.com/ffbarri
 - [ADR-0002: my-cloud-pki Repository Layout](https://github.com/ffbarrie/my-cloud/blob/main/docs/adr/0002-my-cloud-pki-repository-layout.md)
 - [ADR-0003: PKI Certificate Naming and Subject DN Policy](https://github.com/ffbarrie/my-cloud/blob/main/docs/adr/0003-pki-certificate-naming.md)
 
+## Bootstrap without an HSM
+
+If you do not have Nitrokey HSM 2 devices yet, or do not plan to use an HSM,
+create a temporary OpenSSL software root and sign the issuing CA with the
+[bootstrap software root CA runbook](bootstrap/software-root-ca.md). Replace that
+root with the HSM offline ceremony when hardware is available.
+
 ## Repository layout
 
 ```text
@@ -16,7 +23,7 @@ my-cloud-pki
 ├── .env.example
 ├── README.md
 ├── docs/             # Runbooks and operational docs
-├── bootstrap/        # One-time / rare setup helpers
+├── bootstrap/        # One-time / rare setup helpers (incl. software root CA)
 ├── offline-ca/       # Offline root CA (docs, HSM init, ceremonies; not always-on)
 │   └── profiles/     # Certificate profile templates (*.cnf.example)
 ├── issuing-ca/       # Online intermediate / issuing CA

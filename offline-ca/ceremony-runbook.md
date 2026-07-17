@@ -17,6 +17,11 @@ This runbook covers:
 This runbook does not cover day-to-day leaf certificate issuance. Workload
 certificates are issued by online intermediate CAs.
 
+If Nitrokey HSM 2 devices are not available yet, or will not be used, create a
+temporary file-based root with the
+[bootstrap software root CA runbook](../bootstrap/software-root-ca.md) instead of
+this ceremony. Migrate to this runbook when HSMs are in place.
+
 ## Security Model
 
 The offline root CA private key is held on Nitrokey HSM 2 hardware and is not
