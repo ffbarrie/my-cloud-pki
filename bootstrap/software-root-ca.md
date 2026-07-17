@@ -186,8 +186,8 @@ Copy only what the online stack needs:
 | `*.srl` | Local CA state next to the root key | **Never** |
 
 Update `issuing-ca/` service configuration to use the issued certificate and key
-once that service wiring exists. Until then, keep the verified artifacts under
-`bootstrap/artifacts/` (local only).
+once EJBCA is running — see [../issuing-ca/getting-started.md](../issuing-ca/getting-started.md).
+Until then, keep the verified artifacts under `bootstrap/artifacts/` (local only).
 
 ## 5. Record what you did
 
