@@ -1,3 +1,57 @@
 # Online PKI services only. The offline root CA is not a long-running service.
-# See offline-ca/ and ADR-0001 / ADR-0002 in my-cloud.
-services: {}
+# See offline-ca/, ADR-0001, ADR-0002, and ADR-0004 in my-cloud.
+#
+# Bring up: docker compose up -d
+# Docs:     issuing-ca/getting-started.md
+
+name: my-cloud-pki
+
+services:
+  ejbca-database:
+    image: mariadb:11.4
+    container_name: my-cloud-pki-ejbca-db
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: ${EJBCA_DB_ROOT_PASSWORD}
+      MYSQL_DATABASE: ${EJBCA_DB_NAME:-ejbca}
+      MYSQL_USER: ${EJBCA_DB_USER:-ejbca}
+      MYSQL_PASSWORD: ${EJBCA_DB_PASSWORD}
+    volumes:
+      - ./issuing-ca/data/mariadb:/var/lib/mysql
+    networks:
+      - pki-internal
+    healthcheck:
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+
+  ejbca:
+    image: keyfactor/ejbca-ce:${EJBCA_IMAGE_TAG:-latest}
+    container_name: my-cloud-pki-ejbca
+    hostname: ${EJBCA_HOSTNAME:-ejbca}
+    restart: unless-stopped
+    depends_on:
+      ejbca-database:
+        condition: service_healthy
+    environment:
+      DATABASE_JDBC_URL: jdbc:mariadb://ejbca-database:3306/${EJBCA_DB_NAME:-ejbca}?characterEncoding=UTF-8
+      DATABASE_USER: ${EJBCA_DB_USER:-ejbca}
+      DATABASE_PASSWORD: ${EJBCA_DB_PASSWORD}
+      LOG_LEVEL_APP: ${EJBCA_LOG_LEVEL_APP:-INFO}
+      LOG_LEVEL_SERVER: ${EJBCA_LOG_LEVEL_SERVER:-INFO}
+      # simple = allow initial admin without client cert (lab bootstrap only).
+      # Switch to true after SuperAdmin is enrolled; see issuing-ca/getting-started.md.
+      TLS_SETUP_ENABLED: ${EJBCA_TLS_SETUP_ENABLED:-simple}
+    ports:
+      - "${EJBCA_HTTP_PORT:-8080}:8080"
+      - "${EJBCA_HTTPS_PORT:-8443}:8443"
+    networks:
+      - pki-internal
+      - pki-access
+
+networks:
+  pki-internal:
+    internal: true
+  pki-access:
