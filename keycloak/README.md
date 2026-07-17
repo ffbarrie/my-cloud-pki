@@ -7,4 +7,8 @@ Keycloak does not replace the issuing CA. EJBCA remains the CA
 Keycloak is planned for admin / enrollment identity once the online CA is
 stable.
 
+Keycloak should use **PostgreSQL**, consistent with
+[ADR-0005](https://github.com/ffbarrie/my-cloud/blob/main/docs/adr/0005-postgresql-datastore.md).
+Give Keycloak its own database on Postgres—do not share the EJBCA schema.
+
 See [../issuing-ca/](../issuing-ca/).

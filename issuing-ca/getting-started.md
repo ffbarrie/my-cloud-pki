@@ -4,8 +4,11 @@ Bring up EJBCA Community as the online issuing CA, create the first SuperAdmin
 credential, then import or create the My Cloud Issuing CA under either the
 bootstrap software root or the HSM offline root.
 
-Official Keyfactor tutorial (reference):
+Official Keyfactor tutorial (MariaDB-oriented reference):
 https://docs.keyfactor.com/ejbca/latest/tutorial-start-out-with-ejbca-docker-container
+
+This lab uses **PostgreSQL** instead of MariaDB
+([ADR-0005](https://github.com/ffbarrie/my-cloud/blob/main/docs/adr/0005-postgresql-datastore.md)).
 
 ## Prerequisites
 
@@ -15,13 +18,13 @@ https://docs.keyfactor.com/ejbca/latest/tutorial-start-out-with-ejbca-docker-con
 
 ```sh
 cp .env.example .env
-# Edit EJBCA_DB_PASSWORD and EJBCA_DB_ROOT_PASSWORD before first start.
+# Edit EJBCA_DB_PASSWORD before first start.
 ```
 
 ## 1. Start the stack
 
 ```sh
-mkdir -p issuing-ca/data/mariadb
+mkdir -p issuing-ca/data/postgres
 docker compose up -d
 docker compose ps
 docker compose logs -f ejbca
@@ -91,7 +94,8 @@ After the issuing CA exists:
 - Create certificate and end-entity profiles for server / client TLS
 - Enable EST under the `est/` integration notes when ready
 - Confirm CRL and OCSP URLs for issued certificates (`crl/`, `ocsp/`)
-- Plan Keycloak integration for admin or enrollment identity (`keycloak/`)
+- Plan Keycloak integration for admin or enrollment identity (`keycloak/`),
+  also on PostgreSQL per ADR-0005
 
 ## 5. Stop and data
 
@@ -99,13 +103,17 @@ After the issuing CA exists:
 docker compose down
 ```
 
-MariaDB data persists under `issuing-ca/data/mariadb/` (gitignored). Treat that
-directory as sensitive: it holds CA state. Back it up according to
+PostgreSQL data persists under `issuing-ca/data/postgres/` (gitignored). Treat
+that directory as sensitive: it holds CA state. Back it up according to
 [`../backups/`](../backups/).
+
+If you previously started the MariaDB-based scaffold, remove
+`issuing-ca/data/mariadb/` and start fresh with Postgres—do not mix engines on
+the same volume.
 
 ## Security notes
 
-- Change database passwords before the first `compose up`.
+- Change `EJBCA_DB_PASSWORD` before the first `compose up`.
 - `TLS_SETUP_ENABLED=simple` is for lab bootstrap only.
 - Do not commit `.env`, database dumps, SuperAdmin P12 files, or CA private
   keys.
