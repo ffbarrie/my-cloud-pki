@@ -3,7 +3,13 @@
 .env.*
 !.env.example
 !offline-ca/.env.example
+!bootstrap/.env.example
 
 # Local certificate profiles — only *.cnf.example is tracked
 offline-ca/profiles/*.cnf
 !offline-ca/profiles/*.cnf.example
+bootstrap/profiles/*.cnf
+!bootstrap/profiles/*.cnf.example
+
+# Bootstrap software CA working state (keys, certs, serials)
+bootstrap/artifacts/
