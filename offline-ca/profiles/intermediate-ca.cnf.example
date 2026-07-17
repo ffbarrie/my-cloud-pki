@@ -1,0 +1,19 @@
+# Copy to intermediate-ca.cnf and customize for your lab. Local *.cnf files are gitignored.
+# Policy: https://github.com/ffbarrie/my-cloud/blob/main/docs/adr/0003-pki-certificate-naming.md
+
+[ req ]
+default_bits       = 4096
+prompt             = no
+default_md         = sha256
+distinguished_name = req_distinguished_name
+req_extensions     = v3_intermediate_ca
+
+[ req_distinguished_name ]
+CN = My Cloud Issuing CA
+O  = My Cloud
+OU = PKI
+
+[ v3_intermediate_ca ]
+basicConstraints     = critical, CA:true, pathlen:0
+keyUsage             = critical, keyCertSign, cRLSign
+subjectKeyIdentifier = hash

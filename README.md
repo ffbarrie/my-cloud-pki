@@ -6,6 +6,7 @@ Architecture decisions live in the central [My Cloud](https://github.com/ffbarri
 
 - [ADR-0001: Nitrokey HSM 2 for Offline CA](https://github.com/ffbarrie/my-cloud/blob/main/docs/adr/0001-nitrokey-hsm2-offline-ca.md)
 - [ADR-0002: my-cloud-pki Repository Layout](https://github.com/ffbarrie/my-cloud/blob/main/docs/adr/0002-my-cloud-pki-repository-layout.md)
+- [ADR-0003: PKI Certificate Naming and Subject DN Policy](https://github.com/ffbarrie/my-cloud/blob/main/docs/adr/0003-pki-certificate-naming.md)
 
 ## Repository layout
 
@@ -17,6 +18,7 @@ my-cloud-pki
 ├── docs/             # Runbooks and operational docs
 ├── bootstrap/        # One-time / rare setup helpers
 ├── offline-ca/       # Offline root CA (docs, HSM init, ceremonies; not always-on)
+│   └── profiles/     # Certificate profile templates (*.cnf.example)
 ├── issuing-ca/       # Online intermediate / issuing CA
 ├── ocsp/             # OCSP responder
 ├── est/              # Enrollment over Secure Transport

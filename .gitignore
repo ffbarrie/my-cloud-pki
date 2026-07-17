@@ -1,4 +1,9 @@
-# Environment files — only .env.example is tracked
+# Environment files — only .env.example files are tracked
 .env
 .env.*
 !.env.example
+!offline-ca/.env.example
+
+# Local certificate profiles — only *.cnf.example is tracked
+offline-ca/profiles/*.cnf
+!offline-ca/profiles/*.cnf.example
