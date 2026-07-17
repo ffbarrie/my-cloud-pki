@@ -65,16 +65,68 @@ Goal: an intermediate CA whose subject matches
 [ADR-0003](https://github.com/ffbarrie/my-cloud/blob/main/docs/adr/0003-pki-certificate-naming.md)
 — for My Cloud examples, `CN=My Cloud Issuing CA, O=My Cloud, OU=PKI`.
 
-### While waiting for Nitrokeys (bootstrap)
+### While waiting for Nitrokeys (bootstrap, verified path)
 
-1. In EJBCA, create a CA of type **Subordinate CA** (or generate a CSR for an
-   external signing ceremony—prefer the CSR path so the offline/bootstrap root
-   remains outside EJBCA).
-2. Export the CSR.
-3. Sign it with the
-   [bootstrap software root](../bootstrap/software-root-ca.md).
-4. Import the signed certificate (and bootstrap root as an external CA / trust
-   anchor as required by EJBCA) back into EJBCA.
+This imports the bootstrap-signed issuing CA (key + cert) produced by the
+[bootstrap software root runbook](../bootstrap/software-root-ca.md) into EJBCA as
+an externally-signed CA. All commands use the in-container EJBCA CLI.
+
+1. Build a PKCS#12 from the issuing CA key and cert, including the bootstrap root
+   in the chain (run from the repo root on the host):
+
+   ```sh
+   cd bootstrap/artifacts
+   KSPASS=$(openssl rand -base64 18 | tr -d '/+=' | cut -c1-18)
+   echo "$KSPASS" > issuing-ca.p12.pass && chmod 600 issuing-ca.p12.pass
+   openssl pkcs12 -export \
+     -name "My Cloud Issuing CA" \
+     -inkey issuing-ca.key \
+     -in issuing-ca.crt \
+     -certfile bootstrap-root-ca.crt \
+     -out issuing-ca.p12 \
+     -passout pass:"$KSPASS"
+   chmod 600 issuing-ca.p12
+   cd ../..
+   ```
+
+2. Stream the P12 into the container as the `ejbca` user (a plain
+   `docker compose cp` lands as an unreadable root-owned file), then import:
+
+   ```sh
+   KSPASS=$(cat bootstrap/artifacts/issuing-ca.p12.pass)
+   docker compose exec -T ejbca bash -lc \
+     'cat > /opt/keyfactor/issuing-ca.p12 && chmod 600 /opt/keyfactor/issuing-ca.p12' \
+     < bootstrap/artifacts/issuing-ca.p12
+
+   docker compose exec -T ejbca bash -lc \
+     "/opt/keyfactor/bin/ejbca.sh ca importca \
+       --caname 'My Cloud Issuing CA' \
+       --p12 /opt/keyfactor/issuing-ca.p12 \
+       -kspassword '$KSPASS'"
+
+   # Remove the staged keystore from the container afterward
+   docker compose exec -T ejbca bash -lc 'rm -f /opt/keyfactor/issuing-ca.p12'
+   ```
+
+3. Verify the CA exists and the health check passes:
+
+   ```sh
+   docker compose exec -T ejbca bash -lc \
+     "/opt/keyfactor/bin/ejbca.sh ca listcas" | grep 'CA Name'
+   curl -s http://localhost:8080/ejbca/publicweb/healthcheck/ejbcahealth   # -> ALLOK
+   ```
+
+> **Restart caveat:** the imported soft crypto token uses **manual** activation.
+> The CA is active immediately after import, but after `docker compose restart`
+> (or `up` following a `down`) reactivate it with:
+>
+> ```sh
+> KSPASS=$(cat bootstrap/artifacts/issuing-ca.p12.pass)
+> TOKEN=$(docker compose exec -T ejbca bash -lc \
+>   "/opt/keyfactor/bin/ejbca.sh cryptotoken list" | awk -F'"' '/Imported/{print $2}')
+> docker compose exec -T ejbca bash -lc \
+>   "/opt/keyfactor/bin/ejbca.sh cryptotoken activate --token '$TOKEN' --pin '$KSPASS'"
+> ```
 
 ### After Nitrokeys arrive
 
@@ -84,8 +136,25 @@ Goal: an intermediate CA whose subject matches
 3. Import the signed certificate and offline root into EJBCA.
 4. Remove the bootstrap root from lab trust stores.
 
-Detailed EJBCA click-paths and profile templates will be added as follow-up
-runbooks once the first lab CA is stood up.
+### Validate issuance (optional)
+
+Prove the CA can sign, then clean up the test entity:
+
+```sh
+docker compose exec -T ejbca bash -lc \
+  "/opt/keyfactor/bin/ejbca.sh ra addendentity --username testsvc01 \
+    --dn 'CN=test-service.my.cloud,O=My Cloud' --caname 'My Cloud Issuing CA' \
+    --type 1 --token PEM --password foo123"
+docker compose exec -T ejbca bash -lc \
+  "/opt/keyfactor/bin/ejbca.sh ra setclearpwd testsvc01 foo123"
+docker compose exec -T ejbca bash -lc \
+  "/opt/keyfactor/bin/ejbca.sh batch --username testsvc01"
+# Inspect /opt/keyfactor/p12/pem/test-service.my.cloud.pem, then:
+docker compose exec -T ejbca bash -lc \
+  "/opt/keyfactor/bin/ejbca.sh ra revokeendentity --username testsvc01 -r 5"
+printf 'y\n' | docker compose exec -T ejbca bash -lc \
+  "/opt/keyfactor/bin/ejbca.sh ra delendentity testsvc01"
+```
 
 ## 4. Profiles and protocols (next)
 
