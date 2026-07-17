@@ -1,0 +1,6 @@
+# Keep local EJBCA / MariaDB state out of git
+data/
+*.p12
+*.jks
+*.pem
+!*.pem.example
