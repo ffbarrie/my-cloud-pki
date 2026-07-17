@@ -4,6 +4,9 @@ The online intermediate / issuing CA for My Cloud PKI is
 **[EJBCA Community Edition](https://www.ejbca.org/)**, per
 [ADR-0004](https://github.com/ffbarrie/my-cloud/blob/main/docs/adr/0004-ejbca-online-issuing-ca.md).
 
+Persistent state uses **PostgreSQL**, per
+[ADR-0005](https://github.com/ffbarrie/my-cloud/blob/main/docs/adr/0005-postgresql-datastore.md).
+
 EJBCA is the system of record for:
 
 - Issuing CA key and certificate lifecycle
@@ -26,7 +29,7 @@ issuing-ca/
 ├── README.md
 ├── getting-started.md
 └── data/                 # Local only (gitignored)
-    └── mariadb/          # MariaDB volume for EJBCA
+    └── postgres/         # PostgreSQL volume for EJBCA
 ```
 
 Compose services live in the repository root [`compose.yaml`](../compose.yaml).

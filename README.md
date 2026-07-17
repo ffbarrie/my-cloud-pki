@@ -8,6 +8,7 @@ Architecture decisions live in the central [My Cloud](https://github.com/ffbarri
 - [ADR-0002: my-cloud-pki Repository Layout](https://github.com/ffbarrie/my-cloud/blob/main/docs/adr/0002-my-cloud-pki-repository-layout.md)
 - [ADR-0003: PKI Certificate Naming and Subject DN Policy](https://github.com/ffbarrie/my-cloud/blob/main/docs/adr/0003-pki-certificate-naming.md)
 - [ADR-0004: EJBCA Community as Online Issuing CA](https://github.com/ffbarrie/my-cloud/blob/main/docs/adr/0004-ejbca-online-issuing-ca.md)
+- [ADR-0005: PostgreSQL for Online Stateful Services](https://github.com/ffbarrie/my-cloud/blob/main/docs/adr/0005-postgresql-datastore.md)
 
 ## Bootstrap without an HSM
 
@@ -18,12 +19,12 @@ root with the HSM offline ceremony when hardware is available.
 
 ## Online issuing CA (EJBCA)
 
-The always-on issuing CA is **EJBCA Community**. See
+The always-on issuing CA is **EJBCA Community** on **PostgreSQL**. See
 [issuing-ca/](issuing-ca/) and [issuing-ca/getting-started.md](issuing-ca/getting-started.md).
 
 ```sh
 cp .env.example .env
-# set database passwords
+# set EJBCA_DB_PASSWORD
 docker compose up -d
 ```
 

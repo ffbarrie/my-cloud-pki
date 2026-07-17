@@ -1,5 +1,5 @@
 # Online PKI services only. The offline root CA is not a long-running service.
-# See offline-ca/, ADR-0001, ADR-0002, and ADR-0004 in my-cloud.
+# See offline-ca/, ADR-0001, ADR-0002, ADR-0004, and ADR-0005 in my-cloud.
 #
 # Bring up: docker compose up -d
 # Docs:     issuing-ca/getting-started.md
@@ -8,24 +8,23 @@ name: my-cloud-pki
 
 services:
   ejbca-database:
-    image: mariadb:11.4
+    image: postgres:16
     container_name: my-cloud-pki-ejbca-db
     restart: unless-stopped
     environment:
-      MYSQL_ROOT_PASSWORD: ${EJBCA_DB_ROOT_PASSWORD}
-      MYSQL_DATABASE: ${EJBCA_DB_NAME:-ejbca}
-      MYSQL_USER: ${EJBCA_DB_USER:-ejbca}
-      MYSQL_PASSWORD: ${EJBCA_DB_PASSWORD}
+      POSTGRES_DB: ${EJBCA_DB_NAME:-ejbca}
+      POSTGRES_USER: ${EJBCA_DB_USER:-ejbca}
+      POSTGRES_PASSWORD: ${EJBCA_DB_PASSWORD}
     volumes:
-      - ./issuing-ca/data/mariadb:/var/lib/mysql
+      - ./issuing-ca/data/postgres:/var/lib/postgresql/data
     networks:
       - pki-internal
     healthcheck:
-      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      test: ["CMD-SHELL", "pg_isready -U \"$$POSTGRES_USER\" -d \"$$POSTGRES_DB\""]
       interval: 10s
       timeout: 5s
       retries: 10
-      start_period: 30s
+      start_period: 20s
 
   ejbca:
     image: keyfactor/ejbca-ce:${EJBCA_IMAGE_TAG:-latest}
@@ -36,7 +35,7 @@ services:
       ejbca-database:
         condition: service_healthy
     environment:
-      DATABASE_JDBC_URL: jdbc:mariadb://ejbca-database:3306/${EJBCA_DB_NAME:-ejbca}?characterEncoding=UTF-8
+      DATABASE_JDBC_URL: jdbc:postgresql://ejbca-database:5432/${EJBCA_DB_NAME:-ejbca}
       DATABASE_USER: ${EJBCA_DB_USER:-ejbca}
       DATABASE_PASSWORD: ${EJBCA_DB_PASSWORD}
       LOG_LEVEL_APP: ${EJBCA_LOG_LEVEL_APP:-INFO}
