@@ -1,181 +1,131 @@
-# Getting started with EST
+# Getting started with EST (companion service)
 
-Enrollment over Secure Transport (RFC 7030) for leaf certificates from the
-online issuing CA.
+Enrollment over Secure Transport (RFC 7030) via the **companion EST service** in this
+repo. EJBCA CE remains the issuing CA; EST talks to EJBCA over **CMP RA mode**.
 
-**This is preparation for future work.** Near-term lab enrollment is **CMP /
-SCEP on EJBCA CE** ([ADR-0004](https://github.com/ffbarrie/my-cloud/blob/main/docs/adr/0004-ejbca-online-issuing-ca.md)).
-EST must still be **built** later (companion front-end or Enterprise revisit).
+Per [ADR-0004](https://github.com/ffbarrie/my-cloud/blob/main/docs/adr/0004-ejbca-online-issuing-ca.md),
+native `/.well-known/est` on `keyfactor/ejbca-ce` is **not** available (no `est.war`).
 
-Official Keyfactor references:
+## Architecture
 
-- https://docs.keyfactor.com/ejbca/latest/est
-- https://docs.keyfactor.com/ejbca/latest/est-ra-mode-configuration
+```text
+Client --EST--> est:8444 --CMP p10cr--> ejbca:8080 --sign--> My Cloud Issuing CA
+```
 
-## Enrollment strategy
+| Layer | Auth | Notes |
+| ----- | ---- | ----- |
+| Client → EST | HTTP Basic (`est-ra.user` / `est-ra.pass`) | Lab RA mode; shared secret can mint **any CN** |
+| EST → EJBCA | CMP HMAC (`cmp-ra.pass`) | Alias `mycloud`, RA mode; HTTP on `pki-internal` |
 
-| Phase | Approach |
-| ----- | -------- |
-| **Now** | Path 1 — stay on CE; enroll with **CMP** and **SCEP** |
-| **Later** | Build **EST** (required end-state); keep EJBCA as the issuing CA |
-
-## Status on EJBCA Community (`keyfactor/ejbca-ce`)
-
-**EST is not available in EJBCA Community Edition.**
-
-On this lab stack (`keyfactor/ejbca-ce:latest`, EJBCA 9.3.x):
-
-| Check | Result |
-| ----- | ------ |
-| Protocol toggle | `ejbca.sh config protocols enable EST` succeeds |
-| Alias config | `ejbca.sh config est …` works (alias `est` configured) |
-| Deployed WAR | **No `est.war`** in `ejbca.ear` (CE ships `cmp.war` / `scep.war`) |
-| HTTP endpoint | `https://localhost:8443/.well-known/est/…` → **404** |
-
-Keyfactor’s Community vs Enterprise matrix lists EST (and ACME) under Enterprise.
-
-What *is* ready and shared with CMP/SCEP:
-
-- Certificate profile **`MyCloudServer`**
-- End entity profile **`MyCloudServerEE`**
-- Example EST RA alias properties under [`aliases/`](aliases/) (for when EST exists)
+Backend choice (spike result): **CMP RA `p10cr`**, not Enrollment REST (REST Certificate
+Management must be enabled in Admin UI and is not CLI-toggleable on CE). No EST-service
+client certificate is used; CMP HMAC replaces that plan idea for the CE lab.
 
 ## Prerequisites
 
 - Issuing CA imported per [../issuing-ca/getting-started.md](../issuing-ca/getting-started.md)
-- Profiles imported (or recreated) as below
+- Profiles `MyCloudServer` / `MyCloudServerEE` in EJBCA
+- Docker Compose stack up (`docker compose up -d`)
 
-## 1. Import TLS profiles
+After `docker compose restart ejbca`, reactivate the imported crypto token before
+enrolling (see issuing-ca getting-started restart caveat).
 
-Profiles live in [`../issuing-ca/profiles/`](../issuing-ca/profiles/). They are
-cloned from EJBCA’s `SERVER` template, with **serverAuth + clientAuth** EKUs so
-reenroll / mTLS can work when EST is available.
+## 1. One-time setup
 
-```sh
-# From repo root
-docker compose exec -T ejbca bash -c 'mkdir -p /tmp/profiles-import && rm -rf /tmp/profiles-import/*'
-docker compose cp issuing-ca/profiles/. ejbca:/tmp/profiles-import/
-docker compose exec -T ejbca bash -lc \
-  '/opt/keyfactor/bin/ejbca.sh ca importprofiles -d /tmp/profiles-import \
-     --caname "My Cloud Issuing CA"'
-```
-
-If a profile name already exists, delete it in the Admin UI
-(**CA Functions → Certificate Profiles** / **RA Functions → End Entity Profiles**)
-before re-importing.
-
-Expected profiles:
-
-| Name | Type | Notes |
-| ---- | ---- | ----- |
-| `MyCloudServer` | Certificate profile | 2y validity; EKU serverAuth + clientAuth; SAN allowed |
-| `MyCloudServerEE` | End entity profile | Required CN; optional DNS SAN; CA = My Cloud Issuing CA; token = User Generated |
-
-After import, note the end-entity profile **numeric id** (Admin UI or
-`config est updatealias` help text). The EST alias references that id.
-
-## 2. EST alias (when EST servlet exists)
-
-These steps succeed on CE for *configuration storage*, but enrollment will still
-404 until an Enterprise (or otherwise EST-enabled) deployment provides
-`est.war`.
+From repo root:
 
 ```sh
-# Lab-only RA credential — do not commit
-mkdir -p est/artifacts
-ESTUSER=estrauser
-ESTPASS=$(openssl rand -base64 18 | tr -d '/+=' | cut -c1-18)
-echo "$ESTUSER" > est/artifacts/est-ra.user
-echo "$ESTPASS" > est/artifacts/est-ra.pass
-chmod 600 est/artifacts/est-ra.*
-
-# Look up MyCloudServerEE id after import (example: 928545354)
-EEPROFILE_ID=<id-from-admin-ui-or-export-filename>
-
-docker compose exec -T ejbca bash -lc \
-  '/opt/keyfactor/bin/ejbca.sh config protocols enable EST'
-
-# Copy and fill aliases/est.properties.example, then:
-docker compose cp est/aliases/est.properties ejbca:/tmp/est.properties
-docker compose exec -T ejbca bash -lc \
-  '/opt/keyfactor/bin/ejbca.sh config est addalias --alias est
-   /opt/keyfactor/bin/ejbca.sh config est uploadfile --alias est --file /tmp/est.properties
-   /opt/keyfactor/bin/ejbca.sh config est dumpalias --alias est'
+./scripts/ejbca-setup-est.sh
+docker compose up -d est
 ```
 
-Default alias name `est` maps to:
+This script:
 
-```text
-https://<host>:8443/.well-known/est/<operation>
-```
+- Copies issuing + bootstrap root PEMs into `est/artifacts/`
+- Configures CMP alias `mycloud` (RA mode, HMAC, PBE responses)
+- Creates EST HTTP Basic and CMP HMAC secrets
+- Issues `est-server.crt` (TLS for the EST listener, signed by the issuing CA)
+- Writes `est/artifacts/est.env` for Compose
 
-The `keyfactor/ejbca-ce` image uses a **single TLS port 8443 with optional client
-certificates**, so initial enroll and reenroll share that port (no 8442).
+Published port (override in `.env`): host **8444** → EST container 8443.
 
-## 3. Verify (requires EST-capable EJBCA)
-
-Trust the HTTPS listener CA (ManagementCA on a default CE quickstart), not the
-PKI issuing CA, for TLS to the EST URL:
+## 2. Verify MVP
 
 ```sh
-docker compose exec -T ejbca bash -lc \
-  '/opt/keyfactor/bin/ejbca.sh ca getcacert --caname ManagementCA -f /tmp/ManagementCA.cacert.pem'
-docker compose cp ejbca:/tmp/ManagementCA.cacert.pem est/artifacts/ManagementCA.cacert.pem
+./scripts/est-smoke.sh
+```
 
-CACERT=est/artifacts/ManagementCA.cacert.pem
-ESTUSER=$(cat est/artifacts/est-ra.user)
-ESTPASS=$(cat est/artifacts/est-ra.pass)
-BASE=https://localhost:8443/.well-known/est
+Or manually:
 
-# CA certs (PKCS#7)
-curl -sk --cacert "$CACERT" -o est/artifacts/cacerts.p7 "$BASE/cacerts"
+```sh
+ART=est/artifacts
+TRUST=$ART/IssuingCA.cacert.pem
+ESTUSER=$(cat $ART/est-ra.user)
+ESTPASS=$(cat $ART/est-ra.pass)
+BASE=https://localhost:8444/.well-known/est
 
-# Initial enroll (RA username/password)
-openssl req -nodes -newkey rsa:2048 -keyout est/artifacts/device.key \
-  -out est/artifacts/device.csr -outform DER -subj '/CN=est-test.my.cloud'
-openssl base64 -in est/artifacts/device.csr -out est/artifacts/device.b64
-chmod 600 est/artifacts/device.key
+curl -sk --cacert "$TRUST" -o $ART/cacerts.b64 "$BASE/cacerts"
+openssl base64 -A -d -in $ART/cacerts.b64 -out $ART/cacerts.p7
+openssl pkcs7 -inform DER -in $ART/cacerts.p7 -print_certs -noout
 
-curl -sk --cacert "$CACERT" --user "$ESTUSER:$ESTPASS" \
-  --data @est/artifacts/device.b64 -o est/artifacts/device-p7.b64 \
+openssl req -nodes -newkey rsa:2048 -keyout $ART/device.key \
+  -out $ART/device.csr -outform DER -subj '/CN=est-test.my.cloud'
+openssl base64 -in $ART/device.csr -out $ART/device.b64
+chmod 600 $ART/device.key
+
+curl -sk --cacert "$TRUST" --user "$ESTUSER:$ESTPASS" \
+  --data @$ART/device.b64 -o $ART/device-p7.b64 \
   -H 'Content-Type: application/pkcs10' \
   -H 'Content-Transfer-Encoding: base64' \
   "$BASE/simpleenroll"
 
-openssl base64 -d -in est/artifacts/device-p7.b64 -out est/artifacts/device-p7.der
-openssl pkcs7 -inform DER -in est/artifacts/device-p7.der -print_certs \
-  -out est/artifacts/device-cert.pem
-openssl x509 -in est/artifacts/device-cert.pem -noout -subject -issuer
+openssl base64 -A -d -in $ART/device-p7.b64 -out $ART/device-p7.der
+openssl pkcs7 -inform DER -in $ART/device-p7.der -print_certs -out $ART/device-cert.pem
+openssl x509 -in $ART/device-cert.pem -noout -subject -issuer
 ```
 
-Reenroll always uses the existing client certificate (mTLS) against
-`$BASE/simplereenroll`.
+Trust the **issuing CA** PEM for TLS to EST (`--cacert IssuingCA.cacert.pem`). CSR subject
+should use **CN only** to match `MyCloudServerEE` (no O/OU in the CSR).
 
-On CE today, expect **HTTP 404** from the curl steps above.
+## Deferred: simplereenroll (v1.1) — do not forget
 
-## Near-term enrollment (path 1 — do this instead of EST for now)
+**MVP does not implement certificate renewal.**
 
-| Protocol | CE image | Notes |
-| -------- | -------- | ----- |
-| CMP | Yes (`cmp.war`) | Servlet at `/ejbca/publicweb/cmp` — **next to document/enable** |
-| SCEP | Yes (`scep.war`) | Under `/ejbca/publicweb/apply/scep/…` — **next to document/enable** |
-| Admin / CLI batch | Yes | Already used in issuing-ca getting-started |
-| ACME | No (Enterprise) | Out of scope for now |
+| Item | Detail |
+| ---- | ------ |
+| Endpoint | `POST /.well-known/est/simplereenroll` |
+| MVP | Returns **501** with message pointing here |
+| Blockers | mTLS trust (optional client cert on enroll, required on reenroll); CE end-entity `GENERATED` status; renewal via CMP `kur` or profile flags; revocation checks |
 
-## Building EST later
+**v1.1 acceptance criteria:**
 
-Track under this directory. Likely options (pick in a follow-up ADR when ready):
+1. Spike-proven renewal path on CE (likely CMP `kur` from the companion).
+2. EST listener trusts My Cloud Issuing CA for client certs on reenroll.
+3. Valid leaf renews; revoked leaf rejected.
+4. Same-key vs new-key policy aligned with profiles.
+5. Smoke script covers reenroll success and auth failure.
 
-1. **Companion EST front-end** — clients speak EST; the service asks EJBCA
-   (WS/REST/CMP/etc.) to issue.
-2. **EJBCA Enterprise** — native `est.war` if licensing becomes acceptable.
+Do not close the “deferred simplereenroll” tracking item when MVP merges.
 
-Until one of those ships, treat EST curl steps above as **not expected to
-succeed** on CE.
+## Enterprise-native EST (unused on CE)
+
+[`aliases/est.properties.example`](aliases/est.properties.example) documents EJBCA
+Enterprise native EST alias properties. On CE, `ejbca.sh config est …` stores config but
+`/.well-known/est` still 404s without `est.war`.
 
 ## Security notes
 
-- Treat `est/artifacts/est-ra.*` as secrets; they are gitignored.
-- The EST RA username has broad RA rights for that alias—lab only.
-- Do not commit ManagementCA private material; the PEM from `getcacert` is the
-  public TLS trust anchor only.
+- Treat `est/artifacts/*` and `est.env` as secrets; gitignored.
+- HTTP Basic RA on EST is **lab only** (any holder can request any CN).
+- CMP HMAC secret grants issuance rights to the companion only; kept off process
+  argv via an openssl `file:` secret.
+- EST→EJBCA CMP uses HTTP on the Compose internal network—do not publish EJBCA
+  `:8080` beyond the lab host without TLS and tighter auth.
+- Do not commit issuing CA private keys; setup uses local bootstrap artifacts.
+
+## Related
+
+- [README.md](README.md)
+- [../scripts/ejbca-setup-est.sh](../scripts/ejbca-setup-est.sh)
+- [../scripts/est-smoke.sh](../scripts/est-smoke.sh)
+- [../issuing-ca/getting-started.md](../issuing-ca/getting-started.md)

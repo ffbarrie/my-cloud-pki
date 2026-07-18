@@ -11,7 +11,7 @@ EJBCA is the system of record for:
 
 - Issuing CA key and certificate lifecycle
 - Certificate / end-entity profiles
-- Enrollment protocols (CMP/SCEP now on CE; EST to build later — see `../est/`)
+- Enrollment protocols (CMP/SCEP native on CE; companion EST — see `../est/`)
 - CRL and OCSP publication (initially; see `../ocsp/`, `../crl/`, `../est/`)
 
 ## Docs

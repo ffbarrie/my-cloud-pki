@@ -1,8 +1,9 @@
-# Example EST alias properties for upload via:
-#   ejbca.sh config est uploadfile --alias est --file est.properties
+# Example EST alias properties for EJBCA Enterprise native EST only.
+# Unused on keyfactor/ejbca-ce (no est.war). The lab uses the companion EST
+# service under ../ with CMP RA backend instead.
 #
-# Copy to est.properties (gitignored), fill EEPROFILE_ID and secrets.
-# EST enrollment requires an EJBCA build that ships est.war (not CE).
+# Upload via (Enterprise):
+#   ejbca.sh config est uploadfile --alias est --file est.properties
 
 est.operationmode=ra
 est.defaultca=My Cloud Issuing CA

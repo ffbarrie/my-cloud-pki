@@ -10,7 +10,8 @@ Exported certificate and end-entity profiles for My Cloud leaf TLS.
 ## Contents (lab defaults)
 
 - **MyCloudServer** — cloned from EJBCA `SERVER`; validity `2y`; EKU
-  `serverAuth` + `clientAuth` (clientAuth added for EST reenroll / mTLS).
+  `serverAuth` + `clientAuth`; `allowdnoverride` + `allowextensionoverride`
+  enabled for RA-mode enrollment (EST companion / CMP).
 - **MyCloudServerEE** — required CN; optional DNS SAN; available CA
   `My Cloud Issuing CA`; default certificate profile `MyCloudServer`;
   token User Generated.
@@ -28,4 +29,4 @@ docker compose exec -T ejbca bash -lc \
 Fixed built-in profiles (`SERVER`, `ENDUSER`, …) are not exported. Delete a
 custom profile in the Admin UI before re-importing the same name.
 
-See [../est/getting-started.md](../est/getting-started.md) for EST alias wiring.
+See [../est/getting-started.md](../est/getting-started.md) for companion EST (not native EJBCA EST).

@@ -73,11 +73,11 @@
   </void>
   <void method="put">
    <string>allowextensionoverride</string>
-   <boolean>false</boolean>
+   <boolean>true</boolean>
   </void>
   <void method="put">
    <string>allowdnoverride</string>
-   <boolean>false</boolean>
+   <boolean>true</boolean>
   </void>
   <void method="put">
    <string>allowdnoverridebyeei</string>

@@ -163,19 +163,22 @@ printf 'y\n' | docker compose exec -T ejbca bash -lc \
   "/opt/keyfactor/bin/ejbca.sh ra delendentity testsvc01"
 ```
 
-## 4. Profiles and protocols (next)
+## 4. Profiles, EST companion, and other protocols
 
 After the issuing CA exists:
 
 - Import TLS profiles from [`profiles/`](profiles/) (`MyCloudServer` /
   `MyCloudServerEE`)
-- **Near-term enrollment (path 1):** enable and document **CMP** and **SCEP**
-  on CE (native servlets)
-- **Later:** build **EST** — CE has no EST servlet; see
-  [`../est/getting-started.md`](../est/getting-started.md)
+- **EST (companion):** `./scripts/ejbca-setup-est.sh` then `docker compose up -d est`
+  — see [`../est/getting-started.md`](../est/getting-started.md). MVP:
+  `/cacerts` + `/simpleenroll` on host port **8444**; `/simplereenroll` deferred v1.1.
+- **CMP / SCEP:** native CE servlets (optional client-facing paths; CMP also backs EST)
 - Confirm CRL and OCSP URLs for issued certificates (`crl/`, `ocsp/`)
 - Plan Keycloak integration for admin or enrollment identity (`keycloak/`),
   also on PostgreSQL per ADR-0005
+
+After `docker compose restart ejbca`, reactivate the imported crypto token before
+EST or CMP enrollment (see restart caveat in section 3).
 
 ## 5. Stop and data
 
