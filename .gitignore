@@ -14,5 +14,9 @@ bootstrap/profiles/*.cnf
 # Bootstrap software CA working state (keys, certs, serials)
 bootstrap/artifacts/
 
+# EST local secrets and enrollment scratch (keys, RA password, test CSRs)
+est/artifacts/
+est/aliases/est.properties
+
 # EJBCA / MariaDB local data (also covered by issuing-ca/.gitignore)
 issuing-ca/data/

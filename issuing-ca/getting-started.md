@@ -90,11 +90,18 @@ an externally-signed CA. All commands use the in-container EJBCA CLI.
    ```
 
 2. Stream the P12 into the container as the `ejbca` user (a plain
-   `docker compose cp` lands as an unreadable root-owned file), then import:
+   `docker compose cp` lands as an unreadable root-owned file), then import.
+
+   Use `bash -c` (not `-lc`) for file staging: a login shell sources
+   `/etc/profile`, which prints a harmless
+   `id: cannot find name for user ID 10001` because the image runs as UID
+   10001 with no matching `/etc/passwd` entry. Keep `-lc` for `ejbca.sh`
+   so the CLI picks up the image's Java/`PATH` profile settings (ignore the
+   same warning there).
 
    ```sh
    KSPASS=$(cat bootstrap/artifacts/issuing-ca.p12.pass)
-   docker compose exec -T ejbca bash -lc \
+   docker compose exec -T ejbca bash -c \
      'cat > /opt/keyfactor/issuing-ca.p12 && chmod 600 /opt/keyfactor/issuing-ca.p12' \
      < bootstrap/artifacts/issuing-ca.p12
 
@@ -105,7 +112,7 @@ an externally-signed CA. All commands use the in-container EJBCA CLI.
        -kspassword '$KSPASS'"
 
    # Remove the staged keystore from the container afterward
-   docker compose exec -T ejbca bash -lc 'rm -f /opt/keyfactor/issuing-ca.p12'
+   docker compose exec -T ejbca bash -c 'rm -f /opt/keyfactor/issuing-ca.p12'
    ```
 
 3. Verify the CA exists and the health check passes:
@@ -160,8 +167,12 @@ printf 'y\n' | docker compose exec -T ejbca bash -lc \
 
 After the issuing CA exists:
 
-- Create certificate and end-entity profiles for server / client TLS
-- Enable EST under the `est/` integration notes when ready
+- Import TLS profiles from [`profiles/`](profiles/) (`MyCloudServer` /
+  `MyCloudServerEE`)
+- **Near-term enrollment (path 1):** enable and document **CMP** and **SCEP**
+  on CE (native servlets)
+- **Later:** build **EST** — CE has no EST servlet; see
+  [`../est/getting-started.md`](../est/getting-started.md)
 - Confirm CRL and OCSP URLs for issued certificates (`crl/`, `ocsp/`)
 - Plan Keycloak integration for admin or enrollment identity (`keycloak/`),
   also on PostgreSQL per ADR-0005

@@ -1,0 +1,18 @@
+# Example EST alias properties for upload via:
+#   ejbca.sh config est uploadfile --alias est --file est.properties
+#
+# Copy to est.properties (gitignored), fill EEPROFILE_ID and secrets.
+# EST enrollment requires an EJBCA build that ships est.war (not CE).
+
+est.operationmode=ra
+est.defaultca=My Cloud Issuing CA
+est.certprofile=MyCloudServer
+# Numeric end-entity profile id from Admin UI or export filename
+est.eeprofile=REPLACE_WITH_MyCloudServerEE_ID
+est.requirecert=false
+est.requsername=estrauser
+est.reqpassword=REPLACE_WITH_STRONG_PASSWORD
+est.allowupdatewithsamekey=false
+est.ra.namegenerationscheme=DN
+est.ra.namegenerationparameters=CN
+est.severkeygenenabled=false

@@ -11,7 +11,7 @@ EJBCA is the system of record for:
 
 - Issuing CA key and certificate lifecycle
 - Certificate / end-entity profiles
-- Enrollment protocols (including EST)
+- Enrollment protocols (CMP/SCEP now on CE; EST to build later — see `../est/`)
 - CRL and OCSP publication (initially; see `../ocsp/`, `../crl/`, `../est/`)
 
 ## Docs
@@ -28,6 +28,7 @@ EJBCA is the system of record for:
 issuing-ca/
 ├── README.md
 ├── getting-started.md
+├── profiles/             # Exported MyCloudServer / MyCloudServerEE XML
 └── data/                 # Local only (gitignored)
     └── postgres/         # PostgreSQL volume for EJBCA
 ```
