@@ -167,8 +167,12 @@ printf 'y\n' | docker compose exec -T ejbca bash -lc \
 
 After the issuing CA exists:
 
-- Create certificate and end-entity profiles for server / client TLS
-- Enable EST under the `est/` integration notes when ready
+- Import TLS profiles from [`profiles/`](profiles/) (`MyCloudServer` /
+  `MyCloudServerEE`)
+- **Near-term enrollment (path 1):** enable and document **CMP** and **SCEP**
+  on CE (native servlets)
+- **Later:** build **EST** — CE has no EST servlet; see
+  [`../est/getting-started.md`](../est/getting-started.md)
 - Confirm CRL and OCSP URLs for issued certificates (`crl/`, `ocsp/`)
 - Plan Keycloak integration for admin or enrollment identity (`keycloak/`),
   also on PostgreSQL per ADR-0005
