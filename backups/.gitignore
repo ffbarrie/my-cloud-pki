@@ -1,0 +1,17 @@
+# Local staging (ciphertext and manifests before/after rsync)
+staging/
+
+# Optional SuperAdmin P12 drop zone (never commit)
+private/
+
+# Local operator config (NAS host, paths, retention)
+config.env
+
+# Age recipient pubkey may be kept local; it is non-secret but lab-specific
+age-recipient.txt
+
+# Never allow plaintext dumps or decrypted trees
+*.dump
+*.tar.gz
+identity.txt
+identity.txt.pub
