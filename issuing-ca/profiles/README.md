@@ -29,4 +29,5 @@ docker compose exec -T ejbca bash -lc \
 Fixed built-in profiles (`SERVER`, `ENDUSER`, …) are not exported. Delete a
 custom profile in the Admin UI before re-importing the same name.
 
-See [../est/getting-started.md](../est/getting-started.md) for companion EST (not native EJBCA EST).
+See [../est/getting-started.md](../est/getting-started.md) for companion EST (not native EJBCA EST)
+and [../scep/getting-started.md](../scep/getting-started.md) for native CE SCEP (CA/Client mode).

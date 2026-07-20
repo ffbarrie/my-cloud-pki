@@ -126,6 +126,7 @@ restore_secrets() {
   refuse_if_exists "$ROOT/.env"
   refuse_if_exists "$ROOT/bootstrap/artifacts"
   refuse_if_exists "$ROOT/est/artifacts"
+  refuse_if_exists "$ROOT/scep/artifacts"
 
   if [[ -f "$bundle/dotenv" ]]; then
     cp -a "$bundle/dotenv" "$ROOT/.env"
@@ -149,13 +150,19 @@ restore_secrets() {
     cp -a "$bundle/est/artifacts" "$ROOT/est/artifacts"
     chmod 700 "$ROOT/est/artifacts" 2>/dev/null || true
   fi
+  if [[ -d "$bundle/scep/artifacts" ]]; then
+    mkdir -p "$ROOT/scep"
+    rm -rf "$ROOT/scep/artifacts"
+    cp -a "$bundle/scep/artifacts" "$ROOT/scep/artifacts"
+    chmod 700 "$ROOT/scep/artifacts" 2>/dev/null || true
+  fi
   if [[ -f "$bundle/backups-private/superadmin.p12" ]]; then
     mkdir -p "$ROOT/backups/private"
     cp -a "$bundle/backups-private/superadmin.p12" "$ROOT/backups/private/superadmin.p12"
     chmod 600 "$ROOT/backups/private/superadmin.p12"
     echo "Restored SuperAdmin P12 to backups/private/superadmin.p12"
   fi
-  echo "Secrets restored (.env, bootstrap/artifacts, est/artifacts)."
+  echo "Secrets restored (.env, bootstrap/artifacts, est/artifacts, scep/artifacts)."
 }
 
 load_env() {
@@ -244,11 +251,12 @@ print_checklist() {
      docker compose exec -T ejbca bash -lc \
        "/opt/keyfactor/bin/ejbca.sh cryptotoken activate --token '$TOKEN' --pin '$KSPASS'"
 
-3. Start EST:
+3. Start EST (if used):
      docker compose up -d est
 
-4. Smoke test:
+4. Smoke tests:
      ./scripts/est-smoke.sh
+     ./scripts/scep-smoke.sh
 
 5. If EJBCA_TLS_SETUP_ENABLED=true, import SuperAdmin P12 into the browser
    (from backups/private/superadmin.p12 if restored).

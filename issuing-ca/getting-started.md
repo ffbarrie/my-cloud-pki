@@ -172,13 +172,16 @@ After the issuing CA exists:
 - **EST (companion):** `./scripts/ejbca-setup-est.sh` then `docker compose up -d est`
   — see [`../est/getting-started.md`](../est/getting-started.md). MVP:
   `/cacerts` + `/simpleenroll` on host port **8444**; `/simplereenroll` deferred v1.1.
-- **CMP / SCEP:** native CE servlets (optional client-facing paths; CMP also backs EST)
+- **CMP:** native CE servlet (also backs EST); alias `mycloud` from EST setup
+- **SCEP:** native CE servlet in **CA/Client mode** — `./scripts/ejbca-setup-scep.sh`
+  then [`../scep/getting-started.md`](../scep/getting-started.md). RA mode is
+  Enterprise-only (CE rejects PKCSReq if `operationmode=ra`).
 - Confirm CRL and OCSP URLs for issued certificates (`crl/`, `ocsp/`)
 - Plan Keycloak integration for admin or enrollment identity (`keycloak/`),
   also on PostgreSQL per ADR-0005
 
 After `docker compose restart ejbca`, reactivate the imported crypto token before
-EST or CMP enrollment (see restart caveat in section 3).
+EST, CMP, or SCEP enrollment (see restart caveat in section 3).
 
 ## 5. Stop and data
 

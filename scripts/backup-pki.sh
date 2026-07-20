@@ -206,7 +206,8 @@ backup_secrets() {
   cleanup_tmp() { rm -rf "$tmp"; }
   trap cleanup_tmp EXIT
 
-  mkdir -p "$tmp/bundle/bootstrap" "$tmp/bundle/est/artifacts" "$tmp/bundle/backups-private"
+  mkdir -p "$tmp/bundle/bootstrap" "$tmp/bundle/est/artifacts" \
+    "$tmp/bundle/scep/artifacts" "$tmp/bundle/backups-private"
   cp -a "$ROOT/bootstrap/artifacts" "$tmp/bundle/bootstrap/"
   if [[ -d "$ROOT/est/artifacts" ]]; then
     # Copy EST artifacts but exclude regenerable smoke / device scratch
@@ -217,6 +218,12 @@ backup_secrets() {
       --exclude='smoke-*' \
       --exclude='cacerts.p7' \
       . | tar -C "$tmp/bundle/est/artifacts" -xf -
+  fi
+  if [[ -d "$ROOT/scep/artifacts" ]]; then
+    tar -C "$ROOT/scep/artifacts" -cf - \
+      --exclude='smoke-*' \
+      --exclude='device.*' \
+      . | tar -C "$tmp/bundle/scep/artifacts" -xf -
   fi
   cp -a "$ROOT/.env" "$tmp/bundle/dotenv"
   if [[ -f "$ROOT/backups/private/superadmin.p12" ]]; then

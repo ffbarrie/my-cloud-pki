@@ -52,6 +52,7 @@ run backups from a Linux/macOS machine that can reach Docker and the repo).
 | P0 | SuperAdmin client P12 | Browser/OS (not in repo) | Manual export into secrets bundle |
 | P0 | Age identity key | Off-host only | Password manager + encrypted USB |
 | P1 | EST + CMP secrets | `est/artifacts/` (excl. smoke scratch) | Age secrets bundle |
+| P1 | SCEP challenge + client env | `scep/artifacts/` (excl. smoke scratch) | Age secrets bundle |
 | P1 | Compose `.env` | repo root `.env` | Age secrets bundle |
 | P2 | Profiles, compose, scripts | Git | Git is source of truth |
 | Future P0 | Nitrokey HSM A + B | Physical | Device custody (not file backup) |
@@ -63,7 +64,7 @@ Do not back up regenerable smoke artifacts (`device.key`, `smoke-device.*`).
 | Artifact | When |
 |----------|------|
 | Postgres dump (encrypted) | Weekly while the lab is active; also after issuance/revocation spikes, profile/CMP changes, or before upgrades |
-| Secrets bundle (encrypted) | After bootstrap, EST setup, password rotation, SuperAdmin export, or any ceremony |
+| Secrets bundle (encrypted) | After bootstrap, EST/SCEP setup, password rotation, SuperAdmin export, or any ceremony |
 | Cold USB copy of secrets + age identity | After every secrets-bundle change (software-root era) |
 
 No scheduler in v1 — run `./scripts/backup-pki.sh` manually.
@@ -149,14 +150,14 @@ backups across upgrades.
 
 ```text
 1. Decrypt secrets bundle to a secure temp dir (AGE_IDENTITY required)
-2. Restore .env, bootstrap/artifacts, est/artifacts
+2. Restore .env, bootstrap/artifacts, est/artifacts, scep/artifacts
 3. Start ejbca-database only
 4. DROP/CREATE the ejbca database (or use a fresh postgres volume)
 5. Decrypt dump and pg_restore (EJBCA stopped)
 6. Start ejbca
 7. Activate crypto token with issuing-ca.p12.pass
-8. Start est
-9. Run ./scripts/est-smoke.sh
+8. Start est (if used)
+9. Run ./scripts/est-smoke.sh and ./scripts/scep-smoke.sh
 10. Import SuperAdmin P12 if TLS is hardened
 ```
 
