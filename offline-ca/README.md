@@ -11,6 +11,11 @@ Documentation, HSM initialization, and ceremony scripts for the offline root CA.
 - Waiting for HSMs, or no HSM at all?
   [Bootstrap software root CA](../bootstrap/software-root-ca.md)
 
+## Public trust anchor
+
+- [root-ca.crt](root-ca.crt) — My Cloud Offline Root CA (public certificate only;
+  private key remains on the Nitrokey HSM 2 devices)
+
 ## Certificate profiles
 
 - [profiles/README.md](profiles/README.md)
@@ -18,7 +23,8 @@ Documentation, HSM initialization, and ceremony scripts for the offline root CA.
 - [profiles/intermediate-ca.cnf.example](profiles/intermediate-ca.cnf.example)
 
 Copy `*.cnf.example` to local `*.cnf` files and optionally `.env.example` to `.env`
-before a ceremony. Local profile files are gitignored.
+before a ceremony. Local profile files and unredacted working notes under
+`ceremonies/` are gitignored.
 
 This directory is the canonical home for offline CA material even though the root
 does not run as a continuous Docker service. See:
