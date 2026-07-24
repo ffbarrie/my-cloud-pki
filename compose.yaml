@@ -50,6 +50,39 @@ services:
       - pki-internal
       - pki-access
 
+  est:
+    build:
+      context: ./est
+      dockerfile: Dockerfile
+    container_name: my-cloud-pki-est
+    restart: unless-stopped
+    depends_on:
+      - ejbca
+    env_file:
+      - ./est/artifacts/est.env
+    environment:
+      EST_LISTEN_ADDR: ${EST_LISTEN_ADDR:-:8443}
+      EST_TLS_CERT: ${EST_TLS_CERT:-/etc/est/artifacts/est-server.crt}
+      EST_TLS_KEY: ${EST_TLS_KEY:-/etc/est/artifacts/est-server.key}
+      EJBCA_CMP_URL: ${EJBCA_CMP_URL:-http://ejbca:8080/ejbca/publicweb/cmp/mycloud}
+      EJBCA_CMP_REF: ${EJBCA_CMP_REF:-mycloud}
+      EJBCA_CMP_SRVCERT: ${EJBCA_CMP_SRVCERT:-/etc/est/artifacts/IssuingCA.cacert.pem}
+      EST_CACERTS_ISSUING: ${EST_CACERTS_ISSUING:-/etc/est/artifacts/IssuingCA.cacert.pem}
+      EST_CACERTS_ROOT: ${EST_CACERTS_ROOT:-/etc/est/artifacts/bootstrap-root-ca.crt}
+    ports:
+      - "${EST_HTTPS_PORT:-8444}:8443"
+    volumes:
+      - ./est/artifacts:/etc/est/artifacts:ro
+    networks:
+      - pki-internal
+      - pki-access
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "-", "https://127.0.0.1:8443/healthz", "--no-check-certificate"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
 networks:
   pki-internal:
     internal: true

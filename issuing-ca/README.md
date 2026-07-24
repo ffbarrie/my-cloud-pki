@@ -11,7 +11,7 @@ EJBCA is the system of record for:
 
 - Issuing CA key and certificate lifecycle
 - Certificate / end-entity profiles
-- Enrollment protocols (CMP/SCEP now on CE; EST to build later — see `../est/`)
+- Enrollment protocols (CMP + SCEP CA/Client mode native on CE; companion EST — see `../est/`, `../scep/`)
 - CRL and OCSP publication (initially; see `../ocsp/`, `../crl/`, `../est/`)
 
 ## Docs
@@ -20,6 +20,7 @@ EJBCA is the system of record for:
 | --- | ------- |
 | [getting-started.md](getting-started.md) | Bring up Compose, first admin access, next steps |
 | [../bootstrap/software-root-ca.md](../bootstrap/software-root-ca.md) | Temporary OpenSSL root while waiting for Nitrokeys |
+| [../offline-ca/hsm-initialization.md](../offline-ca/hsm-initialization.md) | Nitrokey init, DKEK, wrap/unwrap smoke test |
 | [../offline-ca/ceremony-runbook.md](../offline-ca/ceremony-runbook.md) | HSM offline root ceremonies |
 
 ## Layout

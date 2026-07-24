@@ -1,8 +1,14 @@
 # Copy to root-ca.cnf and customize for your lab. Local *.cnf files are gitignored.
 # Policy: https://github.com/ffbarrie/my-cloud/blob/main/docs/adr/0003-pki-certificate-naming.md
+#
+# Validity: set default_days here (used by `openssl req -x509` / `openssl ca`
+# unless overridden with -days on the command line). 7300 = 20 years — a common
+# offline HSM root lifetime for a home-lab trust anchor; change if you prefer
+# shorter (e.g. 3650 = 10 years).
 
 [ req ]
 default_bits       = 4096
+default_days       = 7300
 prompt             = no
 default_md         = sha256
 distinguished_name = req_distinguished_name

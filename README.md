@@ -41,7 +41,8 @@ my-cloud-pki
 │   └── profiles/     # Certificate profile templates (*.cnf.example)
 ├── issuing-ca/       # Online intermediate / issuing CA (EJBCA CE)
 ├── ocsp/             # OCSP responder
-├── est/              # Enrollment over Secure Transport
+├── est/              # Companion EST front-end (RFC 7030; CMP backend)
+├── scep/             # Native EJBCA CE SCEP (CA/Client mode; docs + artifacts)
 ├── crl/              # CRL publication
 ├── keycloak/         # Identity integration for PKI flows
 ├── monitoring/       # Observability for online PKI components

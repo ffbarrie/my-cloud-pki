@@ -11,12 +11,19 @@ offline-ca/profiles/*.cnf
 bootstrap/profiles/*.cnf
 !bootstrap/profiles/*.cnf.example
 
+# Unredacted / working ceremony notes — never commit
+offline-ca/ceremonies/
+
 # Bootstrap software CA working state (keys, certs, serials)
 bootstrap/artifacts/
 
 # EST local secrets and enrollment scratch (keys, RA password, test CSRs)
 est/artifacts/
 est/aliases/est.properties
+est/artifacts/est.env
+
+# SCEP local secrets and enrollment scratch (challenge, CA certs, smoke)
+scep/artifacts/
 
 # EJBCA / MariaDB local data (also covered by issuing-ca/.gitignore)
 issuing-ca/data/

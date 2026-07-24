@@ -137,11 +137,21 @@ an externally-signed CA. All commands use the in-container EJBCA CLI.
 
 ### After Nitrokeys arrive
 
-1. Generate a fresh issuing CA CSR from EJBCA (recommended when cutting over).
+Preferred cutover when EJBCA already has an issuing CA:
+
+1. Generate a fresh issuing CA CSR from EJBCA.
 2. Sign it in an
    [offline CA ceremony](../offline-ca/ceremony-runbook.md#intermediate-ca-issuance-ceremony).
 3. Import the signed certificate and offline root into EJBCA.
 4. Remove the bootstrap root from lab trust stores.
+
+If EJBCA is **not** standing yet, generate the issuing CA key and CSR with
+OpenSSL on the offline workstation, sign with the HSM root (same ceremony
+section; lab default **825** days), keep `issuing-ca.key` in offline custody,
+and later build a P12 for import using the same pattern as the bootstrap path
+above (substitute `offline-ca/root-ca.crt` for the bootstrap root in
+`-certfile`). Published public certs live under `offline-ca/issuing-ca.crt`
+and `offline-ca/root-ca.crt`.
 
 ### Validate issuance (optional)
 
@@ -163,19 +173,25 @@ printf 'y\n' | docker compose exec -T ejbca bash -lc \
   "/opt/keyfactor/bin/ejbca.sh ra delendentity testsvc01"
 ```
 
-## 4. Profiles and protocols (next)
+## 4. Profiles, EST companion, and other protocols
 
 After the issuing CA exists:
 
 - Import TLS profiles from [`profiles/`](profiles/) (`MyCloudServer` /
   `MyCloudServerEE`)
-- **Near-term enrollment (path 1):** enable and document **CMP** and **SCEP**
-  on CE (native servlets)
-- **Later:** build **EST** — CE has no EST servlet; see
-  [`../est/getting-started.md`](../est/getting-started.md)
+- **EST (companion):** `./scripts/ejbca-setup-est.sh` then `docker compose up -d est`
+  — see [`../est/getting-started.md`](../est/getting-started.md). MVP:
+  `/cacerts` + `/simpleenroll` on host port **8444**; `/simplereenroll` deferred v1.1.
+- **CMP:** native CE servlet (also backs EST); alias `mycloud` from EST setup
+- **SCEP:** native CE servlet in **CA/Client mode** — `./scripts/ejbca-setup-scep.sh`
+  then [`../scep/getting-started.md`](../scep/getting-started.md). RA mode is
+  Enterprise-only (CE rejects PKCSReq if `operationmode=ra`).
 - Confirm CRL and OCSP URLs for issued certificates (`crl/`, `ocsp/`)
 - Plan Keycloak integration for admin or enrollment identity (`keycloak/`),
   also on PostgreSQL per ADR-0005
+
+After `docker compose restart ejbca`, reactivate the imported crypto token before
+EST, CMP, or SCEP enrollment (see restart caveat in section 3).
 
 ## 5. Stop and data
 
