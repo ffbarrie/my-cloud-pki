@@ -11,6 +11,9 @@ offline-ca/profiles/*.cnf
 bootstrap/profiles/*.cnf
 !bootstrap/profiles/*.cnf.example
 
+# Unredacted / working ceremony notes — never commit
+offline-ca/ceremonies/
+
 # Bootstrap software CA working state (keys, certs, serials)
 bootstrap/artifacts/
 

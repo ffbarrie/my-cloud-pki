@@ -12,4 +12,6 @@ at all. It creates a file-based OpenSSL root and signs the issuing CA.
 - [profiles/](profiles/) — OpenSSL profile examples
 
 This path is explicitly non-secure relative to [ADR-0001](https://github.com/ffbarrie/my-cloud/blob/main/docs/adr/0001-nitrokey-hsm2-offline-ca.md).
-When HSMs are available, migrate using the [offline CA ceremony runbook](../offline-ca/ceremony-runbook.md).
+When HSMs are available, initialize them with
+[hsm-initialization.md](../offline-ca/hsm-initialization.md), then migrate using
+the [offline CA ceremony runbook](../offline-ca/ceremony-runbook.md).

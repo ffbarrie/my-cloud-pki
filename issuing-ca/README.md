@@ -20,6 +20,7 @@ EJBCA is the system of record for:
 | --- | ------- |
 | [getting-started.md](getting-started.md) | Bring up Compose, first admin access, next steps |
 | [../bootstrap/software-root-ca.md](../bootstrap/software-root-ca.md) | Temporary OpenSSL root while waiting for Nitrokeys |
+| [../offline-ca/hsm-initialization.md](../offline-ca/hsm-initialization.md) | Nitrokey init, DKEK, wrap/unwrap smoke test |
 | [../offline-ca/ceremony-runbook.md](../offline-ca/ceremony-runbook.md) | HSM offline root ceremonies |
 
 ## Layout

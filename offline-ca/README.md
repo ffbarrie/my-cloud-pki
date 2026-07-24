@@ -4,7 +4,10 @@ Documentation, HSM initialization, and ceremony scripts for the offline root CA.
 
 ## Runbooks
 
-- [Offline CA Ceremony Runbook](ceremony-runbook.md)
+- [Nitrokey HSM 2 initialization and redundancy](hsm-initialization.md) —
+  Linux tooling, DKEK setup, wrap/unwrap smoke test
+- [Offline CA Ceremony Runbook](ceremony-runbook.md) — root and intermediate
+  ceremonies after HSMs are initialized
 - Waiting for HSMs, or no HSM at all?
   [Bootstrap software root CA](../bootstrap/software-root-ca.md)
 
