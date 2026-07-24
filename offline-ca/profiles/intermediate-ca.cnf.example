@@ -1,19 +1,32 @@
 # Copy to intermediate-ca.cnf and customize for your lab. Local *.cnf files are gitignored.
 # Policy: https://github.com/ffbarrie/my-cloud/blob/main/docs/adr/0003-pki-certificate-naming.md
+#
+# Validity: choose intermediate lifetime at sign time with `openssl x509 -req
+# -days N` (not default_days here). 825 days (~2.25 years) is the My Cloud
+# lab default for the issuing CA under the HSM offline root.
+#
+# Use v3_intermediate_req for `openssl req` (no AKI — there is no issuer yet).
+# Use v3_intermediate_ca for `openssl x509 -req -extensions` when the root signs.
 
 [ req ]
 default_bits       = 4096
 prompt             = no
 default_md         = sha256
 distinguished_name = req_distinguished_name
-req_extensions     = v3_intermediate_ca
+req_extensions     = v3_intermediate_req
 
 [ req_distinguished_name ]
 CN = My Cloud Issuing CA
 O  = My Cloud
 OU = PKI
 
-[ v3_intermediate_ca ]
+[ v3_intermediate_req ]
 basicConstraints     = critical, CA:true, pathlen:0
 keyUsage             = critical, keyCertSign, cRLSign
 subjectKeyIdentifier = hash
+
+[ v3_intermediate_ca ]
+basicConstraints       = critical, CA:true, pathlen:0
+keyUsage               = critical, keyCertSign, cRLSign
+subjectKeyIdentifier   = hash
+authorityKeyIdentifier = keyid:always,issuer

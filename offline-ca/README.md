@@ -11,10 +11,15 @@ Documentation, HSM initialization, and ceremony scripts for the offline root CA.
 - Waiting for HSMs, or no HSM at all?
   [Bootstrap software root CA](../bootstrap/software-root-ca.md)
 
-## Public trust anchor
+## Public trust anchors
 
 - [root-ca.crt](root-ca.crt) — My Cloud Offline Root CA (public certificate only;
   private key remains on the Nitrokey HSM 2 devices)
+- [issuing-ca.crt](issuing-ca.crt) — My Cloud Issuing CA (public intermediate;
+  private key is OpenSSL file-based until imported into EJBCA — never commit the
+  key)
+- [issuing-ca-chain.pem](issuing-ca-chain.pem) — intermediate + offline root
+  (convenience chain)
 
 ## Certificate profiles
 

@@ -137,11 +137,21 @@ an externally-signed CA. All commands use the in-container EJBCA CLI.
 
 ### After Nitrokeys arrive
 
-1. Generate a fresh issuing CA CSR from EJBCA (recommended when cutting over).
+Preferred cutover when EJBCA already has an issuing CA:
+
+1. Generate a fresh issuing CA CSR from EJBCA.
 2. Sign it in an
    [offline CA ceremony](../offline-ca/ceremony-runbook.md#intermediate-ca-issuance-ceremony).
 3. Import the signed certificate and offline root into EJBCA.
 4. Remove the bootstrap root from lab trust stores.
+
+If EJBCA is **not** standing yet, generate the issuing CA key and CSR with
+OpenSSL on the offline workstation, sign with the HSM root (same ceremony
+section; lab default **825** days), keep `issuing-ca.key` in offline custody,
+and later build a P12 for import using the same pattern as the bootstrap path
+above (substitute `offline-ca/root-ca.crt` for the bootstrap root in
+`-certfile`). Published public certs live under `offline-ca/issuing-ca.crt`
+and `offline-ca/root-ca.crt`.
 
 ### Validate issuance (optional)
 

@@ -286,32 +286,102 @@ Implementation notes:
 
 ## Intermediate CA Issuance Ceremony
 
-Use this ceremony to sign an intermediate CA CSR from the online issuing CA
-environment.
+Use this ceremony to create or renew the online issuing CA certificate under the
+HSM-held offline root. Two CSR sources are supported:
+
+- **OpenSSL key + CSR** (when EJBCA is not standing yet) — generate
+  `issuing-ca.key` / `issuing-ca.csr` on the offline workstation, sign here,
+  import a P12 into EJBCA later (see
+  [issuing-ca/getting-started.md](../issuing-ca/getting-started.md)).
+- **EJBCA-generated CSR** (recommended when cutting over an existing EJBCA CA) —
+  export the CSR from EJBCA, sign here, import the signed certificate back.
+
+Validity is chosen at sign time (My Cloud lab default: **825** days).
 
 1. Complete the pre-ceremony checklist.
-2. Verify the offline workstation.
-3. Verify the active Nitrokey HSM 2 device.
-4. Inspect the intermediate CA CSR:
+2. Verify the offline workstation and PKCS#11 engine config
+   (`~/hsm-ceremony/openssl-engine-pkcs11.cnf` from the root ceremony; no PIN in
+   the file). Confirm `libengine-pkcs11-openssl` is installed.
+3. Verify the active Nitrokey HSM 2 device lists `MyCloud-Offline-Root`
+   (`pkcs15-tool --list-keys`).
+4. Ensure a local profile exists:
 
    ```sh
-   openssl req -in intermediate-ca.csr -noout -subject -text
+   cp offline-ca/profiles/intermediate-ca.cnf.example \
+     offline-ca/profiles/intermediate-ca.cnf
    ```
 
-5. Confirm the CSR subject matches `profiles/intermediate-ca.cnf` and
+   Confirm subject (`CN=My Cloud Issuing CA`, `O=My Cloud`, `OU=PKI`),
+   `pathlen:0`. The profile has `v3_intermediate_req` (CSR) and
+   `v3_intermediate_ca` (sign-time, includes AKI).
+
+5. If generating the key offline (OpenSSL path):
+
+   ```sh
+   mkdir -p ~/hsm-ceremony
+   openssl genrsa -out ~/hsm-ceremony/issuing-ca.key 4096
+   chmod 600 ~/hsm-ceremony/issuing-ca.key
+   openssl req -new -sha256 \
+     -key ~/hsm-ceremony/issuing-ca.key \
+     -out ~/hsm-ceremony/issuing-ca.csr \
+     -config offline-ca/profiles/intermediate-ca.cnf
+   ```
+
+   Otherwise copy the EJBCA CSR onto the offline workstation as
+   `~/hsm-ceremony/issuing-ca.csr` (public CSR only).
+
+6. Inspect the CSR:
+
+   ```sh
+   openssl req -in ~/hsm-ceremony/issuing-ca.csr -noout -subject -text
+   ```
+
+   Confirm it matches `profiles/intermediate-ca.cnf` and
    [ADR-0003](https://github.com/ffbarrie/my-cloud/blob/main/docs/adr/0003-pki-certificate-naming.md).
-   Verify key usage, extended key usage, path length, and validity period.
-6. Sign the CSR with the offline root CA using the HSM-held root key.
-7. Verify the issued intermediate certificate:
+
+7. Sign the CSR with the HSM-held offline root (PIN prompted by the engine;
+   do not put PIN in argv or conf):
 
    ```sh
-   openssl x509 -in intermediate-ca.crt -noout -subject -issuer -dates -fingerprint -sha256
-   openssl verify -CAfile root-ca.crt intermediate-ca.crt
+   OPENSSL_CONF=~/hsm-ceremony/openssl-engine-pkcs11.cnf \
+   openssl x509 -req -sha256 -days 825 \
+     -in ~/hsm-ceremony/issuing-ca.csr \
+     -CA offline-ca/root-ca.crt \
+     -CAkey 'pkcs11:object=MyCloud-Offline-Root;type=private' \
+     -CAkeyform engine -engine pkcs11 \
+     -out ~/hsm-ceremony/issuing-ca.crt \
+     -extfile offline-ca/profiles/intermediate-ca.cnf \
+     -extensions v3_intermediate_ca \
+     -CAcreateserial -CAserial ~/hsm-ceremony/root-ca.srl
    ```
 
-8. Export the intermediate certificate, root certificate, and redacted ceremony
-   record to trusted transfer media.
-9. Complete the post-ceremony checklist.
+   If the object URI fails, use the same fallbacks as root self-sign (`p11tool`
+   URI listing or engine `-CAkey 0:01` with `-engine pkcs11`).
+
+8. Verify the issued intermediate certificate:
+
+   ```sh
+   openssl x509 -in ~/hsm-ceremony/issuing-ca.crt -noout \
+     -subject -issuer -dates -fingerprint -sha256
+   openssl verify -CAfile offline-ca/root-ca.crt ~/hsm-ceremony/issuing-ca.crt
+   ```
+
+   Expected: subject is the issuing CA, issuer is the offline root, verify
+   prints `OK`, validity ≈ 825 days.
+
+9. Optional chain file for distribution:
+
+   ```sh
+   cat ~/hsm-ceremony/issuing-ca.crt offline-ca/root-ca.crt \
+     > ~/hsm-ceremony/issuing-ca-chain.pem
+   ```
+
+10. Export public artifacts only (`issuing-ca.crt`, optional chain, redacted
+    record). **Never** export or commit `issuing-ca.key`, the CSR (optional to
+    keep offline), or `root-ca.srl`.
+11. Complete the post-ceremony checklist. Commit public certs under
+    `offline-ca/` when appropriate (`issuing-ca.crt`, optional
+    `issuing-ca-chain.pem`).
 
 ## Intermediate CA Revocation Ceremony
 
@@ -378,8 +448,8 @@ Follow-up actions:
 ## Open Items
 
 - Add scripts for repeatable CSR inspection, signing, and artifact verification.
-- Document exact OpenSSL PKCS#11 engine commands for **intermediate CSR
-  signing** and root CRL issuance on the HSM-held key (root self-sign is
-  documented above).
+- Document exact OpenSSL PKCS#11 engine commands for **root CRL issuance** on
+  the HSM-held key (root self-sign and intermediate CSR signing are documented
+  above).
 - Decide where redacted ceremony records will be stored.
 - Document device custody and PIN policy (see ADR-0001 follow-ups).
