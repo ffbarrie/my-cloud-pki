@@ -117,6 +117,7 @@ docker compose exec -T ejbca bash -lc \
 if [[ ! -f "$ART/est-server.key" || ! -f "$ART/est-server.crt" ]]; then
   # The issuing private key belongs to EJBCA in HSM Path A. Have EJBCA generate
   # this leaf key pair and certificate in both modes; never use a host CA key.
+  # Use MyCloudServerEE (not EMPTY): EMPTY cannot select MyCloudServer.
   EST_SERVER_CN="${EST_SERVER_CN:-est.my.cloud}"
   EST_SERVER_PASS="$(openssl rand -base64 18 | tr -d '/+=' | cut -c1-18)"
   CONTAINER_PEM="/opt/keyfactor/p12/pem/${EST_SERVER_CN}.pem"
@@ -126,10 +127,11 @@ if [[ ! -f "$ART/est-server.key" || ! -f "$ART/est-server.crt" ]]; then
     "/opt/keyfactor/bin/ejbca.sh ra delendentity --username '$EST_SERVER_CN'" \
     2>/dev/null || true
   docker compose exec -T ejbca bash -lc \
-    "rm -f '$CONTAINER_PEM'
+    "set -e
+     rm -f '$CONTAINER_PEM'
      /opt/keyfactor/bin/ejbca.sh ra addendentity --username '$EST_SERVER_CN' \
        --dn 'CN=$EST_SERVER_CN' --caname 'My Cloud Issuing CA' \
-       --certprofile MyCloudServer --eeprofile EMPTY \
+       --certprofile MyCloudServer --eeprofile MyCloudServerEE \
        --type 1 --token PEM --password '$EST_SERVER_PASS'
      /opt/keyfactor/bin/ejbca.sh ra setclearpwd '$EST_SERVER_CN' '$EST_SERVER_PASS'
      /opt/keyfactor/bin/ejbca.sh batch --username '$EST_SERVER_CN'"
