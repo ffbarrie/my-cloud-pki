@@ -68,7 +68,7 @@ services:
       EJBCA_CMP_REF: ${EJBCA_CMP_REF:-mycloud}
       EJBCA_CMP_SRVCERT: ${EJBCA_CMP_SRVCERT:-/etc/est/artifacts/IssuingCA.cacert.pem}
       EST_CACERTS_ISSUING: ${EST_CACERTS_ISSUING:-/etc/est/artifacts/IssuingCA.cacert.pem}
-      EST_CACERTS_ROOT: ${EST_CACERTS_ROOT:-/etc/est/artifacts/bootstrap-root-ca.crt}
+      EST_CACERTS_ROOT: ${EST_CACERTS_ROOT:-/etc/est/artifacts/root-ca.crt}
     ports:
       - "${EST_HTTPS_PORT:-8444}:8443"
     volumes:

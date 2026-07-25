@@ -9,6 +9,44 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT"
 
+usage() {
+  echo "Usage: $0 --root bootstrap|hsm" >&2
+}
+
+CA_SOURCE=""
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --root)
+      [[ $# -ge 2 ]] || { usage; exit 2; }
+      CA_SOURCE="$2"
+      shift 2
+      ;;
+    -h|--help)
+      usage
+      exit 0
+      ;;
+    *)
+      echo "Unknown argument: $1" >&2
+      usage
+      exit 2
+      ;;
+  esac
+done
+
+case "$CA_SOURCE" in
+  bootstrap)
+    ROOT_CERT="$ROOT/bootstrap/artifacts/bootstrap-root-ca.crt"
+    ;;
+  hsm)
+    ROOT_CERT="$ROOT/offline-ca/root-ca.crt"
+    ;;
+  *)
+    echo "--root must be either bootstrap or hsm." >&2
+    usage
+    exit 2
+    ;;
+esac
+
 ART="$ROOT/scep/artifacts"
 ALIAS="${SCEP_ALIAS:-mycloud}"
 CANAME="${SCEP_CA_NAME:-My Cloud Issuing CA}"
@@ -16,17 +54,23 @@ CANAME="${SCEP_CA_NAME:-My Cloud Issuing CA}"
 mkdir -p "$ART"
 chmod 700 "$ART"
 
-if [[ ! -f bootstrap/artifacts/issuing-ca.crt ]]; then
-  echo "bootstrap/artifacts/issuing-ca.crt missing; run bootstrap software root first." >&2
+if [[ ! -f "$ROOT_CERT" ]]; then
+  echo "Root certificate missing: $ROOT_CERT" >&2
   exit 1
 fi
 
-cp bootstrap/artifacts/bootstrap-root-ca.crt "$ART/"
-cp bootstrap/artifacts/issuing-ca.crt "$ART/IssuingCA.cacert.pem"
+cp "$ROOT_CERT" "$ART/root-ca.crt"
 
 docker compose exec -T ejbca bash -lc \
   "/opt/keyfactor/bin/ejbca.sh ca getcacert --caname '$CANAME' -f /tmp/IssuingCA.cacert.pem"
 docker compose cp ejbca:/tmp/IssuingCA.cacert.pem "$ART/IssuingCA.cacert.pem"
+docker compose exec -T ejbca bash -c 'rm -f /tmp/IssuingCA.cacert.pem'
+
+if ! openssl verify -CAfile "$ART/root-ca.crt" "$ART/IssuingCA.cacert.pem"; then
+  echo "EJBCA's issuing CA is not signed by the selected $CA_SOURCE root." >&2
+  exit 1
+fi
+printf '%s\n' "$CA_SOURCE" > "$ART/ca-source"
 
 if [[ ! -f "$ART/scep-challenge.pass" ]]; then
   # Avoid characters that break some SCEP clients / shell quoting.
@@ -60,6 +104,7 @@ EOF
 chmod 600 "$ART/client.env"
 
 echo "SCEP (CE CA/Client mode) ready under scep/artifacts/"
+echo "  Root mode: $CA_SOURCE ($ROOT_CERT)"
 echo "  Alias:     $ALIAS"
 echo "  URL:       http://${SCEP_HOST}:${SCEP_PORT}/ejbca/publicweb/apply/scep/${ALIAS}/pkiclient.exe"
 echo "  CA name:   $CANAME  (use URL-encoded as GetCACert message=)"

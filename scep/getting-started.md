@@ -30,19 +30,25 @@ Client --SCEP--> ejbca:8080 /publicweb/apply/scep/mycloud/pkiclient.exe
 
 ## Prerequisites
 
-- Issuing CA imported; crypto token active after any EJBCA restart
+- Issuing CA created using either option in the issuing CA getting-started guide
+- For the bootstrap P12 option, crypto token active after any EJBCA restart
 - Profiles `MyCloudServer` / `MyCloudServerEE` imported
 - Docker Compose stack up (`docker compose up -d`)
 
 ## 1. One-time setup
 
 ```sh
-./scripts/ejbca-setup-scep.sh
+# Pick the root that signed the issuing CA:
+./scripts/ejbca-setup-scep.sh --root bootstrap
+# or:
+./scripts/ejbca-setup-scep.sh --root hsm
 ```
 
 This configures alias `mycloud` in CA mode (`includeca=true`,
 `returnCaChainInGetCaCert=false` for classic `application/x-x509-ca-cert` clients),
-writes `scep/artifacts/scep-challenge.pass`, and caches the issuing CA cert.
+writes `scep/artifacts/scep-challenge.pass`, and caches the issuing and selected
+root CA certs. It verifies that EJBCA's issuing certificate chains to the
+selected root and exits if the wrong mode is selected.
 
 ## 2. Register a device (per enrollment)
 
@@ -90,8 +96,8 @@ Always checks GetCACaps + GetCACert. Full PKCSReq enroll runs if `sscep` is on
   and tighter enrollment controls.
 - Lab challenge in `scep-challenge.pass` is a shared secret for convenience; use a
   unique password per EE in anything beyond smoke tests.
-- After `docker compose restart ejbca`, reactivate the imported crypto token before
-  enrolling (see issuing-ca getting-started).
+- After `docker compose restart ejbca`, reactivate the imported crypto token
+  only for the bootstrap P12 option. The HSM Path A token auto-activates.
 
 ---
 

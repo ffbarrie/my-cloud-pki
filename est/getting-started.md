@@ -27,24 +27,35 @@ client certificate is used; CMP HMAC replaces that plan idea for the CE lab.
 - Profiles `MyCloudServer` / `MyCloudServerEE` in EJBCA
 - Docker Compose stack up (`docker compose up -d`)
 
-After `docker compose restart ejbca`, reactivate the imported crypto token before
-enrolling (see issuing-ca getting-started restart caveat).
+If the issuing CA uses the bootstrap P12 import, reactivate its crypto token
+after an EJBCA restart. The HSM Path A (`ca init`) token auto-activates; see the
+issuing CA getting-started guide.
 
 ## 1. One-time setup
 
 From repo root:
 
 ```sh
-./scripts/ejbca-setup-est.sh
+# Pick the root that signed the issuing CA:
+./scripts/ejbca-setup-est.sh --root bootstrap
+# or:
+./scripts/ejbca-setup-est.sh --root hsm
+
 docker compose up -d est
 ```
 
+The script verifies that EJBCA's issuing certificate chains to the selected
+root and exits if the wrong mode is selected.
+
 This script:
 
-- Copies issuing + bootstrap root PEMs into `est/artifacts/`
+- Fetches the issuing CA from EJBCA and copies the selected root to
+  `est/artifacts/root-ca.crt`
 - Configures CMP alias `mycloud` (RA mode, HMAC, PBE responses)
 - Creates EST HTTP Basic and CMP HMAC secrets
-- Issues `est-server.crt` (TLS for the EST listener, signed by the issuing CA)
+- Has EJBCA issue `est-server.crt` (TLS for the EST listener). This works when
+  the issuing key was generated inside EJBCA by the HSM Path A setup; the setup
+  script never reads an issuing CA private key from the host.
 - Writes `est/artifacts/est.env` for Compose
 
 Published port (override in `.env`): host **8444** → EST container 8443.
@@ -121,7 +132,8 @@ Enterprise native EST alias properties. On CE, `ejbca.sh config est …` stores 
   argv via an openssl `file:` secret.
 - EST→EJBCA CMP uses HTTP on the Compose internal network—do not publish EJBCA
   `:8080` beyond the lab host without TLS and tighter auth.
-- Do not commit issuing CA private keys; setup uses local bootstrap artifacts.
+- Do not commit EST listener private keys or enrollment secrets. The setup
+  script does not read or export the issuing CA private key.
 
 ## Related
 

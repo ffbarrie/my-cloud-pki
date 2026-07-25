@@ -27,7 +27,8 @@ scep/
 After [issuing-ca/getting-started.md](../issuing-ca/getting-started.md) and profile import:
 
 ```sh
-./scripts/ejbca-setup-scep.sh
+./scripts/ejbca-setup-scep.sh --root bootstrap  # bootstrap software root
+# or: ./scripts/ejbca-setup-scep.sh --root hsm  # HSM offline root, Path A
 ./scripts/scep-add-ee.sh your-device.my.cloud
 ./scripts/scep-smoke.sh   # optional; full enroll needs sscep
 ```

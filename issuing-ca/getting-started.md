@@ -49,9 +49,21 @@ https://localhost:8443/ejbca/adminweb/
 ```
 
 Accept the temporary TLS warning if the container is using its built-in
-certificate. Enroll the SuperAdmin credential from the RA enrollment link shown
-in the EJBCA container logs (`docker compose logs ejbca`), import the P12 into
-your browser or OS trust store, then tighten access.
+certificate. Anyone with HTTPS access can manage the instance until you tighten
+access.
+
+Create the first SuperAdmin credential from the RA Web (current EJBCA Community
+images do **not** print a SuperAdmin enrollment URL in the container logs when
+using `simple`):
+
+1. In the Admin UI, open **RA Web**
+2. Under **Request new certificate**, choose **Make New Request**
+3. Keep **ENDUSER**, generate the key pair **By the CA**, and pick a key
+   algorithm (for example RSA 2048)
+4. Set Common Name to `SuperAdmin`
+5. Under **Provide User Credentials**, set a username (for example
+   `superadmin`) and an enrollment password; clear **Key Recoverable** if shown
+6. Download the PKCS#12 and import it into your browser or OS trust store
 
 After SuperAdmin works with a client certificate:
 
@@ -65,7 +77,15 @@ Goal: an intermediate CA whose subject matches
 [ADR-0003](https://github.com/ffbarrie/my-cloud/blob/main/docs/adr/0003-pki-certificate-naming.md)
 — for My Cloud examples, `CN=My Cloud Issuing CA, O=My Cloud, OU=PKI`.
 
-### While waiting for Nitrokeys (bootstrap, verified path)
+Pick **one** option below:
+
+- **Option A — Bootstrap software root** (verified path, while waiting for
+  Nitrokeys). EJBCA imports an OpenSSL-generated issuing key + cert as a P12.
+- **Option B — HSM offline root** (Path A: EJBCA generates the issuing key,
+  the HSM offline root signs the CSR). Use this once the Nitrokey HSM 2 offline
+  root exists.
+
+### Option A — Bootstrap software root (verified path)
 
 This imports the bootstrap-signed issuing CA (key + cert) produced by the
 [bootstrap software root runbook](../bootstrap/software-root-ca.md) into EJBCA as
@@ -135,23 +155,100 @@ an externally-signed CA. All commands use the in-container EJBCA CLI.
 >   "/opt/keyfactor/bin/ejbca.sh cryptotoken activate --token '$TOKEN' --pin '$KSPASS'"
 > ```
 
-### After Nitrokeys arrive
+### Option B — HSM offline root (Path A: EJBCA-generated key)
 
-Preferred cutover when EJBCA already has an issuing CA:
+Use this when the [Nitrokey HSM 2 offline root](../offline-ca/ceremony-runbook.md)
+exists. **EJBCA generates and keeps the issuing CA private key**; the HSM offline
+root only signs the CSR. This is why `offline-ca/` holds **only** public certs
+(`root-ca.crt`, later `issuing-ca.crt`) — there is no issuing private key or CSR
+to publish, and no ceremony-issued "issuing password." The one secret you create
+here is the EJBCA **crypto token password**, which stays on the EJBCA host.
 
-1. Generate a fresh issuing CA CSR from EJBCA.
-2. Sign it in an
-   [offline CA ceremony](../offline-ca/ceremony-runbook.md#intermediate-ca-issuance-ceremony).
-3. Import the signed certificate and offline root into EJBCA.
-4. Remove the bootstrap root from lab trust stores.
+You need `offline-ca/root-ca.crt` (the published offline root) present in this
+checkout before starting.
 
-If EJBCA is **not** standing yet, generate the issuing CA key and CSR with
-OpenSSL on the offline workstation, sign with the HSM root (same ceremony
-section; lab default **825** days), keep `issuing-ca.key` in offline custody,
-and later build a P12 for import using the same pattern as the bootstrap path
-above (substitute `offline-ca/root-ca.crt` for the bootstrap root in
-`-certfile`). Published public certs live under `offline-ca/issuing-ca.crt`
-and `offline-ca/root-ca.crt`.
+1. Choose a strong crypto token password and save it to your secrets bundle
+   ([backups runbook](../backups/runbook.md)) — you will need it if you ever
+   re-activate or export the token:
+
+   ```sh
+   CATOKENPASS=$(openssl rand -base64 18 | tr -d '/+=' | cut -c1-18)
+   echo "$CATOKENPASS"   # copy into your password manager / secrets bundle now
+   ```
+
+2. Stage the offline root into the container so EJBCA registers it as the
+   external signer, then create the CA. `ca init --signedby External` generates
+   the issuing key pair **inside EJBCA** and writes a PKCS#10 CSR to disk; the CA
+   is left in "waiting for certificate response" state.
+
+   ```sh
+   docker compose cp offline-ca/root-ca.crt ejbca:/opt/keyfactor/root-ca.crt
+
+   docker compose exec -T ejbca bash -lc \
+     "cd /opt/keyfactor && /opt/keyfactor/bin/ejbca.sh ca init \
+       'My Cloud Issuing CA' \
+       'CN=My Cloud Issuing CA,O=My Cloud,OU=PKI' \
+       soft '$CATOKENPASS' \
+       4096 RSA 825 null SHA256WithRSA \
+       --signedby External -externalcachain /opt/keyfactor/root-ca.crt"
+   ```
+
+   The validity (`825`) and policy (`null`) args are required positionally but
+   are overridden by the issuer at signing time.
+
+3. Copy the CSR out of the container and convert DER → PEM. EJBCA names it after
+   the CA (spaces preserved):
+
+   ```sh
+   docker compose cp \
+     "ejbca:/opt/keyfactor/My Cloud Issuing CA_csr.der" /tmp/issuing-ca.csr.der
+   openssl req -inform DER -in /tmp/issuing-ca.csr.der -out /tmp/issuing-ca.csr
+   openssl req -in /tmp/issuing-ca.csr -noout -subject -verify
+   ```
+
+   Transport `/tmp/issuing-ca.csr` (public data) to the offline workstation as
+   `~/hsm-ceremony/issuing-ca.csr`.
+
+4. Sign the CSR with the HSM offline root using the **EJBCA-generated CSR** path
+   of the
+   [Intermediate CA Issuance Ceremony](../offline-ca/ceremony-runbook.md#intermediate-ca-issuance-ceremony).
+   That produces `~/hsm-ceremony/issuing-ca.crt`. Export only the public
+   certificate; commit it to `offline-ca/issuing-ca.crt` per the ceremony's
+   post-steps.
+
+5. Bring `offline-ca/issuing-ca.crt` back to the EJBCA host and import the
+   response, which activates the CA:
+
+   ```sh
+   docker compose cp offline-ca/issuing-ca.crt ejbca:/opt/keyfactor/issuing-ca.crt
+   docker compose exec -T ejbca bash -lc \
+     "/opt/keyfactor/bin/ejbca.sh ca importcacert \
+       'My Cloud Issuing CA' /opt/keyfactor/issuing-ca.crt"
+
+   # Clean up staged files in the container
+   docker compose exec -T ejbca bash -c \
+     'rm -f "/opt/keyfactor/My Cloud Issuing CA_csr.der" \
+       /opt/keyfactor/root-ca.crt /opt/keyfactor/issuing-ca.crt'
+   ```
+
+6. Verify the CA is active and the chain is correct:
+
+   ```sh
+   docker compose exec -T ejbca bash -lc \
+     "/opt/keyfactor/bin/ejbca.sh ca listcas" | grep -A2 'My Cloud Issuing CA'
+   docker compose exec -T ejbca bash -lc \
+     "/opt/keyfactor/bin/ejbca.sh ca getcacert --caname 'My Cloud Issuing CA' -f /dev/stdout" \
+     | openssl x509 -noout -subject -issuer
+   curl -s http://localhost:8080/ejbca/publicweb/healthcheck/ejbcahealth   # -> ALLOK
+   ```
+
+   Expected: subject `CN=My Cloud Issuing CA, O=My Cloud, OU=PKI`, issuer
+   `CN=My Cloud Offline Root CA, O=My Cloud, OU=PKI`.
+
+> **No manual reactivation:** unlike the imported bootstrap P12 token (Option A),
+> the soft crypto token created by `ca init` is auto-activated with
+> `CATOKENPASS`, so the issuing CA comes back automatically after
+> `docker compose restart`. Keep `CATOKENPASS` in the secrets bundle regardless.
 
 ### Validate issuance (optional)
 
@@ -179,19 +276,23 @@ After the issuing CA exists:
 
 - Import TLS profiles from [`profiles/`](profiles/) (`MyCloudServer` /
   `MyCloudServerEE`)
-- **EST (companion):** `./scripts/ejbca-setup-est.sh` then `docker compose up -d est`
+- **EST (companion):** `./scripts/ejbca-setup-est.sh --root bootstrap` or
+  `--root hsm`, then `docker compose up -d est`
   — see [`../est/getting-started.md`](../est/getting-started.md). MVP:
   `/cacerts` + `/simpleenroll` on host port **8444**; `/simplereenroll` deferred v1.1.
 - **CMP:** native CE servlet (also backs EST); alias `mycloud` from EST setup
-- **SCEP:** native CE servlet in **CA/Client mode** — `./scripts/ejbca-setup-scep.sh`
-  then [`../scep/getting-started.md`](../scep/getting-started.md). RA mode is
+- **SCEP:** native CE servlet in **CA/Client mode** —
+  `./scripts/ejbca-setup-scep.sh --root bootstrap` or `--root hsm`; then see
+  [`../scep/getting-started.md`](../scep/getting-started.md). RA mode is
   Enterprise-only (CE rejects PKCSReq if `operationmode=ra`).
 - Confirm CRL and OCSP URLs for issued certificates (`crl/`, `ocsp/`)
 - Plan Keycloak integration for admin or enrollment identity (`keycloak/`),
   also on PostgreSQL per ADR-0005
 
-After `docker compose restart ejbca`, reactivate the imported crypto token before
-EST, CMP, or SCEP enrollment (see restart caveat in section 3).
+If you used **Option A** (bootstrap import), reactivate the imported crypto token
+after `docker compose restart ejbca` before EST, CMP, or SCEP enrollment (see the
+restart caveat in section 3). **Option B** (HSM, `ca init`) auto-activates and
+needs no manual step.
 
 ## 5. Stop and data
 

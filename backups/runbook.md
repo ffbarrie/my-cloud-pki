@@ -103,9 +103,13 @@ After enrolling SuperAdmin (see
 
 - **A — Host dies, backups intact:** Decrypt dump + secrets → follow restore
   order → full recovery including issued-certificate history.
-- **B — DB corrupt, secrets intact:** Rebuild from `issuing-ca.p12` + profiles +
-  `./scripts/ejbca-setup-est.sh`. You **lose** end-entity and revocation history
-  unless a dump exists.
+- **B — DB corrupt, secrets intact (bootstrap option only):** Rebuild from
+  `issuing-ca.p12` + profiles + `./scripts/ejbca-setup-est.sh --root bootstrap`.
+  You **lose** end-entity and revocation history unless a dump exists.
+- **HSM Path A warning:** EJBCA generated the issuing private key, so the public
+  files in `offline-ca/` cannot rebuild that CA. Restore PostgreSQL (including
+  the crypto token) from a database backup; otherwise create and sign a new
+  issuing CA. After restore, run `./scripts/ejbca-setup-est.sh --root hsm`.
 - **C — Dump exists, secrets incomplete:** Dump + `issuing-ca.p12.pass` may
   reactivate the soft token if the PIN matches what encrypts the token in the
   DB. Still keep the P12 and bootstrap root for scenario B and trust-anchor

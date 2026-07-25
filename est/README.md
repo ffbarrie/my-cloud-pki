@@ -44,7 +44,8 @@ est/
 After [issuing-ca/getting-started.md](../issuing-ca/getting-started.md):
 
 ```sh
-./scripts/ejbca-setup-est.sh
+./scripts/ejbca-setup-est.sh --root bootstrap  # bootstrap software root
+# or: ./scripts/ejbca-setup-est.sh --root hsm  # HSM offline root, Path A
 docker compose up -d est
 ./scripts/est-smoke.sh
 ```

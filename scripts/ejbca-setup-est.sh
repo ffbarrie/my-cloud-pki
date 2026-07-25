@@ -6,21 +6,70 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT"
 
+usage() {
+  echo "Usage: $0 --root bootstrap|hsm" >&2
+}
+
+CA_SOURCE=""
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --root)
+      [[ $# -ge 2 ]] || { usage; exit 2; }
+      CA_SOURCE="$2"
+      shift 2
+      ;;
+    -h|--help)
+      usage
+      exit 0
+      ;;
+    *)
+      echo "Unknown argument: $1" >&2
+      usage
+      exit 2
+      ;;
+  esac
+done
+
+case "$CA_SOURCE" in
+  bootstrap)
+    ROOT_CERT="$ROOT/bootstrap/artifacts/bootstrap-root-ca.crt"
+    ;;
+  hsm)
+    ROOT_CERT="$ROOT/offline-ca/root-ca.crt"
+    ;;
+  *)
+    echo "--root must be either bootstrap or hsm." >&2
+    usage
+    exit 2
+    ;;
+esac
+
 ART="$ROOT/est/artifacts"
 mkdir -p "$ART"
 chmod 700 "$ART"
 
-if [[ ! -f bootstrap/artifacts/issuing-ca.crt ]]; then
-  echo "bootstrap/artifacts/issuing-ca.crt missing; run bootstrap software root first." >&2
+if [[ ! -f "$ROOT_CERT" ]]; then
+  echo "Root certificate missing: $ROOT_CERT" >&2
   exit 1
 fi
 
-cp bootstrap/artifacts/bootstrap-root-ca.crt "$ART/"
-cp bootstrap/artifacts/issuing-ca.crt "$ART/IssuingCA.cacert.pem"
+cp "$ROOT_CERT" "$ART/root-ca.crt"
 
 docker compose exec -T ejbca bash -lc \
   "/opt/keyfactor/bin/ejbca.sh ca getcacert --caname 'My Cloud Issuing CA' -f /tmp/IssuingCA.cacert.pem"
 docker compose cp ejbca:/tmp/IssuingCA.cacert.pem "$ART/IssuingCA.cacert.pem"
+docker compose exec -T ejbca bash -c 'rm -f /tmp/IssuingCA.cacert.pem'
+
+if ! openssl verify -CAfile "$ART/root-ca.crt" "$ART/IssuingCA.cacert.pem"; then
+  echo "EJBCA's issuing CA is not signed by the selected $CA_SOURCE root." >&2
+  exit 1
+fi
+
+# A source change requires a listener certificate under the new CA chain.
+if [[ ! -f "$ART/ca-source" ]] || [[ "$(cat "$ART/ca-source")" != "$CA_SOURCE" ]]; then
+  rm -f "$ART/est-server.crt" "$ART/est-server.key"
+fi
+printf '%s\n' "$CA_SOURCE" > "$ART/ca-source"
 
 if [[ ! -f "$ART/est-ra.user" ]]; then
   echo "estra" > "$ART/est-ra.user"
@@ -65,18 +114,34 @@ docker compose exec -T ejbca bash -lc \
    /opt/keyfactor/bin/ejbca.sh config cmp updatealias --alias mycloud --key authenticationparameters --value '$CMPPASS'
    /opt/keyfactor/bin/ejbca.sh config cmp updatealias --alias mycloud --key responseprotection --value pbe"
 
-if [[ ! -f "$ART/est-server.key" ]]; then
-  openssl req -new -newkey rsa:2048 -nodes \
-    -keyout "$ART/est-server.key" \
-    -out "$ART/est-server.csr" \
-    -subj "/CN=est.my.cloud"
-  openssl x509 -req -in "$ART/est-server.csr" \
-    -CA bootstrap/artifacts/issuing-ca.crt \
-    -CAkey bootstrap/artifacts/issuing-ca.key \
-    -CAcreateserial \
-    -out "$ART/est-server.crt" \
-    -days 825 -sha256
-  rm -f "$ART/est-server.csr"
+if [[ ! -f "$ART/est-server.key" || ! -f "$ART/est-server.crt" ]]; then
+  # The issuing private key belongs to EJBCA in HSM Path A. Have EJBCA generate
+  # this leaf key pair and certificate in both modes; never use a host CA key.
+  EST_SERVER_CN="${EST_SERVER_CN:-est.my.cloud}"
+  EST_SERVER_PASS="$(openssl rand -base64 18 | tr -d '/+=' | cut -c1-18)"
+  CONTAINER_PEM="/opt/keyfactor/p12/pem/${EST_SERVER_CN}.pem"
+  LOCAL_PEM="$ART/.est-server-combined.pem"
+
+  printf 'y\n' | docker compose exec -T ejbca bash -lc \
+    "/opt/keyfactor/bin/ejbca.sh ra delendentity --username '$EST_SERVER_CN'" \
+    2>/dev/null || true
+  docker compose exec -T ejbca bash -lc \
+    "rm -f '$CONTAINER_PEM'
+     /opt/keyfactor/bin/ejbca.sh ra addendentity --username '$EST_SERVER_CN' \
+       --dn 'CN=$EST_SERVER_CN' --caname 'My Cloud Issuing CA' \
+       --certprofile MyCloudServer --eeprofile EMPTY \
+       --type 1 --token PEM --password '$EST_SERVER_PASS'
+     /opt/keyfactor/bin/ejbca.sh ra setclearpwd '$EST_SERVER_CN' '$EST_SERVER_PASS'
+     /opt/keyfactor/bin/ejbca.sh batch --username '$EST_SERVER_CN'"
+
+  docker compose cp "ejbca:$CONTAINER_PEM" "$LOCAL_PEM"
+  openssl pkey -in "$LOCAL_PEM" -out "$ART/est-server.key"
+  openssl x509 -in "$LOCAL_PEM" -out "$ART/est-server.crt"
+  rm -f "$LOCAL_PEM"
+  docker compose exec -T ejbca bash -lc \
+    "rm -f '$CONTAINER_PEM'
+     printf 'y\n' | /opt/keyfactor/bin/ejbca.sh ra delendentity \
+       --username '$EST_SERVER_CN'" >/dev/null
   chmod 600 "$ART/est-server.key" "$ART/est-server.crt"
 fi
 
@@ -88,6 +153,7 @@ EOF
 chmod 600 "$ART/est.env"
 
 echo "EST artifacts ready under est/artifacts/"
+echo "  Root mode: $CA_SOURCE ($ROOT_CERT)"
 echo "  HTTP Basic (clients -> EST): $(cat "$ART/est-ra.user") / (see est-ra.pass)"
 echo "  CMP HMAC (EST -> EJBCA): see cmp-ra.pass"
 echo "  Note: Basic RA is lab-only; anyone with the password can request any CN."
