@@ -115,36 +115,43 @@ docker compose exec -T ejbca bash -lc \
    /opt/keyfactor/bin/ejbca.sh config cmp updatealias --alias mycloud --key responseprotection --value pbe"
 
 if [[ ! -f "$ART/est-server.key" || ! -f "$ART/est-server.crt" ]]; then
-  # The issuing private key belongs to EJBCA in HSM Path A. Have EJBCA generate
-  # this leaf key pair and certificate in both modes; never use a host CA key.
-  # Use MyCloudServerEE (not EMPTY): EMPTY cannot select MyCloudServer.
+  # The issuing private key belongs to EJBCA in HSM Path A, and MyCloudServerEE
+  # only allows User Generated tokens. So: generate the listener key + CSR on
+  # the host, have EJBCA sign the CSR (createcert). No CA key ever leaves EJBCA.
   EST_SERVER_CN="${EST_SERVER_CN:-est.my.cloud}"
   EST_SERVER_PASS="$(openssl rand -base64 18 | tr -d '/+=' | cut -c1-18)"
-  CONTAINER_PEM="/opt/keyfactor/p12/pem/${EST_SERVER_CN}.pem"
-  LOCAL_PEM="$ART/.est-server-combined.pem"
+
+  openssl req -new -newkey rsa:2048 -nodes \
+    -keyout "$ART/est-server.key" \
+    -out "$ART/est-server.csr" \
+    -subj "/CN=$EST_SERVER_CN"
+  chmod 600 "$ART/est-server.key"
 
   printf 'y\n' | docker compose exec -T ejbca bash -lc \
     "/opt/keyfactor/bin/ejbca.sh ra delendentity --username '$EST_SERVER_CN'" \
     2>/dev/null || true
+  docker compose exec -T ejbca bash -c \
+    'cat > /tmp/est-server.csr' < "$ART/est-server.csr"
   docker compose exec -T ejbca bash -lc \
     "set -e
-     rm -f '$CONTAINER_PEM'
      /opt/keyfactor/bin/ejbca.sh ra addendentity --username '$EST_SERVER_CN' \
        --dn 'CN=$EST_SERVER_CN' --caname 'My Cloud Issuing CA' \
        --certprofile MyCloudServer --eeprofile MyCloudServerEE \
-       --type 1 --token PEM --password '$EST_SERVER_PASS'
-     /opt/keyfactor/bin/ejbca.sh ra setclearpwd '$EST_SERVER_CN' '$EST_SERVER_PASS'
-     /opt/keyfactor/bin/ejbca.sh batch --username '$EST_SERVER_CN'"
+       --type 1 --token USERGENERATED --password '$EST_SERVER_PASS'
+     /opt/keyfactor/bin/ejbca.sh createcert --username '$EST_SERVER_CN' \
+       --password '$EST_SERVER_PASS' -c /tmp/est-server.csr -f /tmp/est-server.crt"
 
-  docker compose cp "ejbca:$CONTAINER_PEM" "$LOCAL_PEM"
-  openssl pkey -in "$LOCAL_PEM" -out "$ART/est-server.key"
-  openssl x509 -in "$LOCAL_PEM" -out "$ART/est-server.crt"
-  rm -f "$LOCAL_PEM"
+  docker compose cp ejbca:/tmp/est-server.crt "$ART/est-server.crt"
   docker compose exec -T ejbca bash -lc \
-    "rm -f '$CONTAINER_PEM'
+    "rm -f /tmp/est-server.csr /tmp/est-server.crt
      printf 'y\n' | /opt/keyfactor/bin/ejbca.sh ra delendentity \
        --username '$EST_SERVER_CN'" >/dev/null
+  rm -f "$ART/est-server.csr"
   chmod 600 "$ART/est-server.key" "$ART/est-server.crt"
+
+  # The issued cert must chain to the issuing CA we fetched earlier.
+  openssl verify -CAfile "$ART/root-ca.crt" -untrusted "$ART/IssuingCA.cacert.pem" \
+    "$ART/est-server.crt"
 fi
 
 cat > "$ART/est.env" <<EOF
