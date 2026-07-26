@@ -2,7 +2,7 @@
 # Configure EJBCA CMP RA alias and local EST artifacts for the companion EST service.
 # Run from my-cloud-pki repo root after the issuing CA is imported.
 #
-# Listener TLS identity (override for the host clients actually dial):
+# Listener TLS identity (lab host clients dial; override if needed):
 #   EST_SERVER_CN=pioche.local
 #   EST_SERVER_SANS='DNS:pioche.local,DNS:localhost,IP:127.0.0.1'
 # Use --force-listener-cert to remint even when key/cert files already exist.
@@ -19,7 +19,7 @@ Usage: $(basename "$0") --root bootstrap|hsm [--force-listener-cert]
   --force-listener-cert  Remint est-server.key/crt even if present
 
 Env:
-  EST_SERVER_CN    Listener CN / EJBCA username (default: est.my.cloud)
+  EST_SERVER_CN    Listener CN / EJBCA username (default: pioche.local)
   EST_SERVER_SANS  Comma-separated SAN list for the CSR (default:
                    DNS:\$EST_SERVER_CN,DNS:localhost,IP:127.0.0.1)
 EOF
@@ -50,7 +50,7 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
-EST_SERVER_CN="${EST_SERVER_CN:-est.my.cloud}"
+EST_SERVER_CN="${EST_SERVER_CN:-pioche.local}"
 EST_SERVER_SANS="${EST_SERVER_SANS:-DNS:${EST_SERVER_CN},DNS:localhost,IP:127.0.0.1}"
 LISTENER_IDENTITY="${EST_SERVER_CN}|${EST_SERVER_SANS}"
 

@@ -277,14 +277,18 @@ After the issuing CA exists:
 - Import TLS profiles from [`profiles/`](profiles/) (`MyCloudServer` /
   `MyCloudServerEE`)
 - **EST (companion):** `./scripts/ejbca-setup-est.sh --root bootstrap` or
-  `--root hsm`, then `docker compose up -d est`
+  `--root hsm`, then `docker compose up -d --force-recreate est`
   — see [`../est/getting-started.md`](../est/getting-started.md). MVP:
   `/cacerts` + `/simpleenroll` on host port **8444**; `/simplereenroll` deferred v1.1.
+  The Issuing CA signs the EST **listener leaf** (`est-server.crt`) as
+  `CN=pioche.local` with SAN `DNS:pioche.local`, `DNS:localhost`, `IP:127.0.0.1`
+  (override with `EST_SERVER_CN` / `EST_SERVER_SANS`). The Issuing CA certificate
+  itself remains `CN=My Cloud Issuing CA` (no host SAN).
 - **CMP:** native CE servlet (also backs EST); alias `mycloud` from EST setup
 - **SCEP:** native CE servlet in **CA/Client mode** —
-  `./scripts/ejbca-setup-scep.sh --root bootstrap` or `--root hsm`; then see
-  [`../scep/getting-started.md`](../scep/getting-started.md). RA mode is
-  Enterprise-only (CE rejects PKCSReq if `operationmode=ra`).
+  `SCEP_HOST=pioche.local ./scripts/ejbca-setup-scep.sh --root bootstrap` or
+  `--root hsm`; then see [`../scep/getting-started.md`](../scep/getting-started.md).
+  RA mode is Enterprise-only (CE rejects PKCSReq if `operationmode=ra`).
 - Confirm CRL and OCSP URLs for issued certificates (`crl/`, `ocsp/`)
 - Plan Keycloak integration for admin or enrollment identity (`keycloak/`),
   also on PostgreSQL per ADR-0005

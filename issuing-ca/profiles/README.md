@@ -14,7 +14,8 @@ Exported certificate and end-entity profiles for My Cloud leaf TLS.
   enabled for RA-mode enrollment (EST companion / CMP).
 - **MyCloudServerEE** — required CN; optional DNS SAN; available CA
   `My Cloud Issuing CA`; default certificate profile `MyCloudServer`;
-  token User Generated.
+  token User Generated. Used for EST listener leaf (`pioche.local` SAN) and
+  device enrollment.
 
 ## Import
 

@@ -36,14 +36,15 @@ issuing CA getting-started guide.
 From repo root:
 
 ```sh
-# Pick the root that signed the issuing CA. Override listener identity when
-# clients dial a real hostname (SANs default to CN + localhost + 127.0.0.1):
-EST_SERVER_CN=pioche.local ./scripts/ejbca-setup-est.sh --root bootstrap
+# Pick the root that signed the issuing CA. Lab default listener identity is
+# CN=pioche.local with SANs DNS:pioche.local, DNS:localhost, IP:127.0.0.1:
+./scripts/ejbca-setup-est.sh --root bootstrap
 # or:
-EST_SERVER_CN=pioche.local ./scripts/ejbca-setup-est.sh --root hsm
+./scripts/ejbca-setup-est.sh --root hsm
 
-# Remint after changing CN/SAN (also automatic when EST_SERVER_* change):
-# EST_SERVER_CN=pioche.local EST_SERVER_SANS='DNS:pioche.local,DNS:localhost,IP:127.0.0.1' \
+# Remint / override (also automatic when EST_SERVER_* change):
+# EST_SERVER_CN=pioche.local \
+#   EST_SERVER_SANS='DNS:pioche.local,DNS:localhost,IP:127.0.0.1' \
 #   ./scripts/ejbca-setup-est.sh --root hsm --force-listener-cert
 
 docker compose up -d --force-recreate est
@@ -58,19 +59,34 @@ This script:
   `est/artifacts/root-ca.crt`
 - Configures CMP alias `mycloud` (RA mode, HMAC, PBE responses)
 - Creates EST HTTP Basic and CMP HMAC secrets
-- Has EJBCA issue `est-server.crt` (TLS for the EST listener) with
-  `EST_SERVER_CN` / `EST_SERVER_SANS` on the CSR (`allowextensionoverride`).
+- Has the **Issuing CA** mint `est-server.crt` (TLS leaf for the EST listener)
+  with `EST_SERVER_CN` / `EST_SERVER_SANS` on the CSR (`allowextensionoverride`).
   Remints when CA source or listener identity changes, or with
   `--force-listener-cert`. The setup script never reads an issuing CA private
   key from the host.
 - Writes `est/artifacts/est.env` for Compose
 
+**TLS identity note:** `pioche.local` goes on the **EST listener leaf** certificate
+(`est/artifacts/est-server.crt`) that the Issuing CA signs. The Issuing CA
+certificate itself stays `CN=My Cloud Issuing CA` (no host SAN) — clients trust
+that CA for chain validation, then match the hostname against the leaf SAN.
+
 | Env | Default | Purpose |
 | --- | ------- | ------- |
-| `EST_SERVER_CN` | `est.my.cloud` | Listener CN / temporary EE username |
-| `EST_SERVER_SANS` | `DNS:$CN,DNS:localhost,IP:127.0.0.1` | CSR Subject Alternative Name |
+| `EST_SERVER_CN` | `pioche.local` | Listener CN / temporary EE username |
+| `EST_SERVER_SANS` | `DNS:pioche.local,DNS:localhost,IP:127.0.0.1` | Leaf Subject Alternative Name |
+
+Expected leaf after setup:
+
+```text
+subject=CN=pioche.local
+X509v3 Subject Alternative Name:
+    DNS:pioche.local, DNS:localhost, IP Address:127.0.0.1
+```
 
 Published port (override in `.env`): host **8444** → EST container 8443.
+Clients on the LAN: `https://pioche.local:8444/.well-known/est` (trust
+`IssuingCA.cacert.pem`).
 
 ## 2. Verify MVP
 
