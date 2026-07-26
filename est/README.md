@@ -44,13 +44,15 @@ est/
 After [issuing-ca/getting-started.md](../issuing-ca/getting-started.md):
 
 ```sh
-./scripts/ejbca-setup-est.sh --root bootstrap  # bootstrap software root
-# or: ./scripts/ejbca-setup-est.sh --root hsm  # HSM offline root, Path A
-docker compose up -d est
+EST_SERVER_CN=pioche.local ./scripts/ejbca-setup-est.sh --root bootstrap
+# or: EST_SERVER_CN=pioche.local ./scripts/ejbca-setup-est.sh --root hsm
+docker compose up -d --force-recreate est
 ./scripts/est-smoke.sh
 ```
 
-Default EST URL: `https://localhost:8444/.well-known/est`
+Default EST URL: `https://localhost:8444/.well-known/est` (also matches SAN).
+For clients on the LAN: `https://pioche.local:8444/.well-known/est` after setting
+`EST_SERVER_CN` (SANs default to CN + `localhost` + `127.0.0.1`).
 
 ## Related
 

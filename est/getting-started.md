@@ -36,12 +36,17 @@ issuing CA getting-started guide.
 From repo root:
 
 ```sh
-# Pick the root that signed the issuing CA:
-./scripts/ejbca-setup-est.sh --root bootstrap
+# Pick the root that signed the issuing CA. Override listener identity when
+# clients dial a real hostname (SANs default to CN + localhost + 127.0.0.1):
+EST_SERVER_CN=pioche.local ./scripts/ejbca-setup-est.sh --root bootstrap
 # or:
-./scripts/ejbca-setup-est.sh --root hsm
+EST_SERVER_CN=pioche.local ./scripts/ejbca-setup-est.sh --root hsm
 
-docker compose up -d est
+# Remint after changing CN/SAN (also automatic when EST_SERVER_* change):
+# EST_SERVER_CN=pioche.local EST_SERVER_SANS='DNS:pioche.local,DNS:localhost,IP:127.0.0.1' \
+#   ./scripts/ejbca-setup-est.sh --root hsm --force-listener-cert
+
+docker compose up -d --force-recreate est
 ```
 
 The script verifies that EJBCA's issuing certificate chains to the selected
@@ -53,10 +58,17 @@ This script:
   `est/artifacts/root-ca.crt`
 - Configures CMP alias `mycloud` (RA mode, HMAC, PBE responses)
 - Creates EST HTTP Basic and CMP HMAC secrets
-- Has EJBCA issue `est-server.crt` (TLS for the EST listener). This works when
-  the issuing key was generated inside EJBCA by the HSM Path A setup; the setup
-  script never reads an issuing CA private key from the host.
+- Has EJBCA issue `est-server.crt` (TLS for the EST listener) with
+  `EST_SERVER_CN` / `EST_SERVER_SANS` on the CSR (`allowextensionoverride`).
+  Remints when CA source or listener identity changes, or with
+  `--force-listener-cert`. The setup script never reads an issuing CA private
+  key from the host.
 - Writes `est/artifacts/est.env` for Compose
+
+| Env | Default | Purpose |
+| --- | ------- | ------- |
+| `EST_SERVER_CN` | `est.my.cloud` | Listener CN / temporary EE username |
+| `EST_SERVER_SANS` | `DNS:$CN,DNS:localhost,IP:127.0.0.1` | CSR Subject Alternative Name |
 
 Published port (override in `.env`): host **8444** → EST container 8443.
 

@@ -22,7 +22,7 @@ Client --SCEP--> ejbca:8080 /publicweb/apply/scep/mycloud/pkiclient.exe
 | Item | Lab value |
 | ---- | --------- |
 | Alias | `mycloud` |
-| URL | `http://localhost:8080/ejbca/publicweb/apply/scep/mycloud/pkiclient.exe` |
+| URL | `http://<SCEP_HOST>:8080/ejbca/publicweb/apply/scep/mycloud/pkiclient.exe` |
 | Mode | `ca` (Client mode) |
 | Auth | CSR `CN` = EJBCA username; CSR `challengePassword` = EE enrollment code |
 | Profiles | `MyCloudServer` / `MyCloudServerEE` |
@@ -38,17 +38,20 @@ Client --SCEP--> ejbca:8080 /publicweb/apply/scep/mycloud/pkiclient.exe
 ## 1. One-time setup
 
 ```sh
-# Pick the root that signed the issuing CA:
-./scripts/ejbca-setup-scep.sh --root bootstrap
+# Pick the root that signed the issuing CA. Set SCEP_HOST to the name clients
+# dial (SCEP is HTTP-only — there is no TLS SAN on this path):
+SCEP_HOST=pioche.local ./scripts/ejbca-setup-scep.sh --root bootstrap
 # or:
-./scripts/ejbca-setup-scep.sh --root hsm
+SCEP_HOST=pioche.local ./scripts/ejbca-setup-scep.sh --root hsm
 ```
 
 This configures alias `mycloud` in CA mode (`includeca=true`,
 `returnCaChainInGetCaCert=false` for classic `application/x-x509-ca-cert` clients),
 writes `scep/artifacts/scep-challenge.pass`, and caches the issuing and selected
 root CA certs. It verifies that EJBCA's issuing certificate chains to the
-selected root and exits if the wrong mode is selected.
+selected root and exits if the wrong mode is selected. `SCEP_HOST` (default
+`localhost`) is written into `scep/artifacts/client.env` and used for the
+setup-time GetCACert fetch.
 
 ## 2. Register a device (per enrollment)
 

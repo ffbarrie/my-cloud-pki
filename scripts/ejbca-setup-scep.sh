@@ -4,13 +4,28 @@
 #
 # CE note: SCEP RA mode can be set in the CLI but enrollment is rejected at runtime
 # ("not included in the community version"). This lab uses CA mode only.
+#
+# Client URL host (no TLS listener cert — SCEP is cleartext HTTP on EJBCA :8080):
+#   SCEP_HOST=pioche.local ./scripts/ejbca-setup-scep.sh --root hsm
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT"
 
 usage() {
-  echo "Usage: $0 --root bootstrap|hsm" >&2
+  cat >&2 <<EOF
+Usage: $(basename "$0") --root bootstrap|hsm
+
+  --root bootstrap|hsm   Trust anchor that signed the issuing CA (required)
+
+Env:
+  SCEP_ALIAS     Alias path segment (default: mycloud)
+  SCEP_CA_NAME   Issuing CA name (default: My Cloud Issuing CA)
+  SCEP_HOST      Host written into client.env / used for GetCACert fetch
+                 (default: localhost). Set to the name clients dial, e.g.
+                 pioche.local — SCEP itself has no TLS SAN (HTTP only).
+  EJBCA_HTTP_PORT  Published EJBCA HTTP port (default: 8080)
+EOF
 }
 
 CA_SOURCE=""
